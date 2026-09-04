@@ -7,6 +7,10 @@ export interface Project {
   id: string
   name: string
   description: string
+  // The HighLevel location this project was created against. Recorded at creation
+  // so a project stays associated with one sub-account's data even if the user
+  // later reconnects to a different one.
+  locationId: string
   createdAt: number
   updatedAt: number
 }
@@ -69,6 +73,9 @@ export interface CalendarEvent {
 
 export type StreamEvent =
   | { type: 'text'; text: string }
+  // Summarised model reasoning. Transient — it is shown while a generation runs
+  // and never stored, which is why it is not part of Message.
+  | { type: 'status'; text: string }
   | { type: 'file'; path: string }
   | { type: 'token'; path: string; text: string }
   | { type: 'done' }

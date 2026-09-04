@@ -7,12 +7,17 @@ import { toast } from 'vue-sonner'
 import FileTree from './FileTree.vue'
 import { languageFor } from '@/lib/preview'
 import { useGeneration } from '@/composables/useGeneration'
+import { useTheme } from '@/composables/useTheme'
 import { useWorkspace } from '@/composables/useWorkspace'
 
 const props = defineProps<{ projectId: string }>()
 
-const { files, revision, writeFile, commitFiles } = useWorkspace(props.projectId)
+const { files, revision, writeFile, saveFile } = useWorkspace(props.projectId)
 const { generating, streamingPath } = useGeneration(props.projectId)
+const { resolved } = useTheme()
+
+// Monaco ships its own themes; follow whichever one the app resolved to.
+const editorTheme = computed(() => (resolved.value === 'dark' ? 'vs-dark' : 'vs'))
 
 const tabs = ref<string[]>([])
 const active = ref<string | null>(null)
@@ -59,13 +64,21 @@ function onChange(next: string | undefined) {
   drafts.value = { ...drafts.value, [active.value]: next ?? '' }
 }
 
-function save() {
+async function save() {
   const path = active.value
   if (!path || generating.value || !isDirty(path)) return
-  writeFile(path, drafts.value[path])
+
+  const edited = drafts.value[path]
+  writeFile(path, edited)
   forget(path)
-  commitFiles()
-  toast.success(`Saved ${path}`)
+  try {
+    await saveFile(path)
+    toast.success(`Saved ${path}`)
+  } catch (e) {
+    // Put the edit back in the draft so a failed write never looks like a saved one.
+    drafts.value = { ...drafts.value, [path]: edited }
+    toast.error(`Could not save ${path}: ${(e as Error).message}`)
+  }
 }
 
 function onMountEditor(ed: editor.IStandaloneCodeEditor, monaco: Monaco) {
@@ -113,16 +126,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown))
     <FileTree :files="files" :active="active" :streaming="streamingPath" @pick="open" />
 
     <div class="flex min-w-0 flex-1 flex-col">
-      <div class="flex h-9 shrink-0 items-stretch overflow-x-auto border-b">
+      <div class="bg-muted/40 flex h-9 shrink-0 items-stretch overflow-x-auto border-b">
         <div
           v-for="tab in tabs"
           :key="tab"
-          class="flex shrink-0 items-center gap-1.5 border-r pr-1 pl-3 text-[13px]"
-          :class="active === tab ? 'bg-accent/50 text-foreground' : 'text-muted-foreground'"
+          class="relative flex shrink-0 items-center gap-1.5 border-r pr-1 pl-3 text-[13px] transition-colors"
+          :class="
+            active === tab
+              ? 'bg-accent/60 text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          "
         >
-          <button class="py-1" @click="active = tab">
+          <!-- The active tab is the one accent that stays lit in the editor. -->
+          <span
+            v-if="active === tab"
+            class="from-primary to-highlight absolute inset-x-0 top-0 h-0.5 bg-linear-to-r"
+          />
+          <button class="py-1 outline-none" @click="active = tab">
             {{ tab }}
-            <span v-if="isDirty(tab)" class="ml-1">&bull;</span>
+            <span v-if="isDirty(tab)" class="text-primary ml-1">&bull;</span>
           </button>
           <span
             class="hover:bg-accent grid size-5 cursor-pointer place-items-center rounded"
@@ -140,7 +162,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown))
           v-if="active && monacoReady"
           :value="value"
           :language="language"
-          theme="vs-dark"
+          :theme="editorTheme"
           :options="{
             fontSize: 12.5,
             minimap: { enabled: false },

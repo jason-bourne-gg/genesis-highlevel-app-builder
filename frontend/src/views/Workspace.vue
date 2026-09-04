@@ -36,7 +36,7 @@ ready.then(() => {
 
 <template>
   <div class="flex h-full flex-col">
-    <header class="flex h-14 shrink-0 items-center gap-3 border-b px-4">
+    <header class="bg-background/70 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-md">
       <Button variant="ghost" size="icon" as-child aria-label="Back to projects">
         <RouterLink to="/"><ArrowLeftIcon /></RouterLink>
       </Button>

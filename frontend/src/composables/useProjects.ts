@@ -1,36 +1,52 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import type { Project } from '@/types'
-import * as store from '@/mocks/projects'
+import * as store from '@/services/projects'
+import { useAuth } from './useAuth'
+import { useHighLevel } from './useHighLevel'
 
 const projects = ref<Project[]>([])
-const loading = ref(false)
-let started = false
+const loading = ref(true)
+let stop: (() => void) | null = null
 
-async function refresh() {
-  loading.value = true
-  try {
-    projects.value = await store.listProjects()
-  } finally {
-    loading.value = false
-  }
-}
+const { user } = useAuth()
+
+// One subscription for the whole app, re-pointed when the signed-in user changes.
+// Without the teardown a signed-out session keeps a listener open on rules that
+// no longer permit it, which surfaces as permission-denied noise in the console.
+watch(
+  user,
+  (next) => {
+    stop?.()
+    stop = null
+
+    if (!next) {
+      projects.value = []
+      loading.value = false
+      return
+    }
+
+    loading.value = true
+    stop = store.watchProjects(next.id, (list) => {
+      projects.value = list
+      loading.value = false
+    })
+  },
+  { immediate: true },
+)
 
 export function useProjects() {
-  if (!started) {
-    started = true
-    refresh()
-  }
+  const { connection } = useHighLevel()
 
   async function create(name: string, description: string) {
-    const project = await store.createProject(name, description)
-    projects.value = [project, ...projects.value]
-    return project
+    if (!user.value) throw new Error('Not signed in')
+    // Stamped at creation rather than read live, so the project keeps pointing at
+    // the sub-account it was actually built for.
+    return store.createProject(user.value.id, name, description, connection.value.locationId ?? '')
   }
 
-  async function remove(id: string) {
-    projects.value = projects.value.filter((p) => p.id !== id)
-    await store.deleteProject(id)
-  }
+  // No local splice: the subscription reports the removal. Doing both would make
+  // the card flicker back in if the write failed.
+  const remove = (id: string) => store.deleteProject(id)
 
-  return { projects, loading, refresh, create, remove }
+  return { projects, loading, create, remove }
 }

@@ -21,9 +21,9 @@ const label = computed(() => {
 const tone = computed(() => {
   switch (connection.value.status) {
     case 'connected':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+      return 'border-success/35 bg-success/12 text-success'
     case 'lost':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+      return 'border-warning/35 bg-warning/12 text-warning'
     default:
       return 'text-muted-foreground'
   }
@@ -32,7 +32,10 @@ const tone = computed(() => {
 
 <template>
   <Badge variant="outline" :class="tone">
-    <span class="size-1.5 rounded-full bg-current" />
+    <span
+      class="size-1.5 rounded-full bg-current"
+      :class="connection.status === 'connected' ? 'animate-pulse' : ''"
+    />
     {{ label }}
   </Badge>
 </template>
