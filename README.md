@@ -325,6 +325,11 @@ firebase functions:secrets:set ANTHROPIC_API_KEY
 
 `generate` declares it with `defineSecret` and lists it in the function's `secrets`
 option, so it is mounted at runtime and never appears in the service definition.
+
+Running the frontend locally needs no Anthropic key: `VITE_GENERATE_URL` points at
+the deployed function, which reads the secret itself. Only the functions emulator
+needs a local copy, in `functions/.secret.local` (gitignored, one `KEY=value` per
+line).
 The HighLevel client secret is still an ordinary environment variable, which is the
 next thing to move.
 
