@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { LoaderCircleIcon, SparklesIcon } from '@lucide/vue'
+import { ChevronRightIcon, LoaderCircleIcon, SparklesIcon } from '@lucide/vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,8 @@ const email = ref('')
 const password = ref('')
 const confirm = ref('')
 const errors = ref<Record<string, string>>({})
+
+const steps = ['Sign in', 'Connect HighLevel', 'Describe your app']
 
 watch(
   () => props.mode,
@@ -82,10 +84,12 @@ async function submit() {
           conversations and calendars, no glue code.
         </p>
       </div>
-      <p class="text-muted-foreground flex items-center gap-2 text-xs">
-        <span class="bg-highlight size-1.5 rounded-full" />
-        Your HighLevel credentials never reach the browser
-      </p>
+      <ol class="text-muted-foreground flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
+        <li v-for="(step, i) in steps" :key="step" class="flex items-center gap-2.5">
+          <ChevronRightIcon v-if="i" class="size-3 opacity-40" />
+          {{ step }}
+        </li>
+      </ol>
     </div>
 
     <div class="relative flex items-center justify-center p-6">
