@@ -2,6 +2,7 @@ import { ref, type Ref } from 'vue'
 import { toast } from 'vue-sonner'
 import type { Message } from '@/types'
 import { streamGeneration } from '@/services/generation'
+import { cancelGeneration } from '@/services/projects'
 import { useModel } from './useModel'
 import { useWorkspace } from './useWorkspace'
 
@@ -10,6 +11,7 @@ interface Session {
   streamingPath: Ref<string | null>
   status: Ref<string>
   controller: AbortController | null
+  generationId: string | null
 }
 
 // Keyed by project so a generation survives navigation and two can run at once.
@@ -23,6 +25,7 @@ function sessionFor(projectId: string): Session {
       streamingPath: ref<string | null>(null),
       status: ref(''),
       controller: null,
+      generationId: null,
     }
     sessions.set(projectId, session)
   }
@@ -73,6 +76,9 @@ export function useGeneration(projectId: string) {
 
       for await (const event of streamGeneration(projectId, text, model.value, controller.signal)) {
         switch (event.type) {
+          case 'started':
+            session.generationId = event.generationId
+            break
           case 'status':
             // Deltas, not whole summaries. Replacing them showed the last few
             // characters flashing past instead of a readable thought.
@@ -113,13 +119,20 @@ export function useGeneration(projectId: string) {
       status.value = ''
       generating.value = false
       session.controller = null
+      session.generationId = null
       // Releasing this swaps the optimistic copies for what the function actually saved.
       workspace.streaming.value = false
     }
   }
 
   // Closing the connection is the signal: the function aborts but still saves finished files.
+  // Closing the connection is not enough: a client disconnect does not reliably
+  // reach the function through Cloud Run, and the generation would run to
+  // completion, overwrite the files and still be billed. The flag is what stops it.
   function stop() {
+    if (session.generationId) {
+      void cancelGeneration(projectId, session.generationId).catch(() => {})
+    }
     session.controller?.abort()
   }
 

@@ -1,5 +1,6 @@
 import {
   addDoc,
+  setDoc,
   collection,
   doc,
   getDoc,
@@ -161,4 +162,8 @@ export async function restoreFiles(projectId: string, files: ProjectFile[]): Pro
   }
   batch.update(doc(projects, projectId), { updatedAt: now })
   await batch.commit()
+}
+
+export function cancelGeneration(projectId: string, generationId: string): Promise<void> {
+  return setDoc(doc(sub(projectId, 'generations'), generationId), { cancelled: true }, { merge: true })
 }

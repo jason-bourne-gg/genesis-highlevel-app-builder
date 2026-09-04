@@ -55,6 +55,13 @@ service cloud.firestore {
         allow read: if ownsProject(projectId);
         allow write: if false;
       }
+
+      // The generate function creates one of these per run and watches it. The
+      // owner writes cancelled here to stop a generation, because a client
+      // disconnect does not reliably reach the function.
+      match /generations/{generationId} {
+        allow read, write: if ownsProject(projectId);
+      }
     }
   }
 }

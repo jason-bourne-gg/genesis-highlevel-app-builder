@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { getFirestore } from 'firebase-admin/firestore'
 import { logger } from 'firebase-functions/v2'
 import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
@@ -81,13 +82,30 @@ export const generate = onRequest(
 
     const controller = new AbortController()
     let aborted = false
-    // req has already ended by the time this handler runs, so req's 'close' never
-    // fires. res 'close' is what reports the client hanging up mid-stream.
-    res.on('close', () => {
-      if (res.writableEnded) return
+
+    const cancel = () => {
+      if (aborted || res.writableEnded) return
       aborted = true
       controller.abort()
-    })
+    }
+
+    // Kept as a fast path, but not relied on: a client disconnect does not
+    // reliably reach the container through Cloud Run's proxy.
+    res.on('close', cancel)
+
+    // So Stop is an explicit signal instead. The client writes cancelled on this
+    // document and the listener picks it up, which does not depend on the
+    // transport noticing anything.
+    const genRef = getFirestore().collection(`projects/${projectId}/generations`).doc()
+    await genRef.set({ startedAt: Date.now(), cancelled: false, model })
+    send({ type: 'started', generationId: genRef.id })
+
+    const unwatch = genRef.onSnapshot(
+      (snap) => {
+        if (snap.data()?.cancelled) cancel()
+      },
+      () => {},
+    )
 
     const parser = new FileStreamParser()
     const open = new Map<string, string>()
@@ -183,6 +201,9 @@ export const generate = onRequest(
     }
 
     // Runs even when the browser walked away — the work is already paid for.
+    unwatch()
+    void genRef.delete().catch(() => {})
+
     usage = priceUsage(model, usageIn, usageOut)
     logger.info('generation.usage', {
       projectId,
