@@ -26,19 +26,34 @@ watch(
   },
 )
 
+// Firebase enforces both of these, but catching them here saves a round trip and
+// a rate-limited attempt.
+const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MIN_PASSWORD = 6
+
 async function submit() {
   const found: Record<string, string> = {}
-  if (!email.value.trim()) found.email = 'Enter your email'
+  const address = email.value.trim()
+
+  if (!address) found.email = 'Enter your email'
+  else if (!LOOKS_LIKE_EMAIL.test(address)) found.email = "That email address doesn't look right"
+
   if (!password.value) found.password = 'Enter a password'
-  if (props.mode === 'signup' && confirm.value !== password.value) {
+  else if (props.mode === 'signup' && password.value.length < MIN_PASSWORD) {
+    found.password = `Use at least ${MIN_PASSWORD} characters`
+  }
+
+  if (props.mode === 'signup' && !confirm.value) found.confirm = 'Confirm your password'
+  else if (props.mode === 'signup' && confirm.value !== password.value) {
     found.confirm = 'Passwords do not match'
   }
+
   errors.value = found
   if (Object.keys(found).length) return
 
   const run = props.mode === 'signin' ? signIn : signUp
   try {
-    await run(email.value.trim(), password.value)
+    await run(address, password.value)
     router.push({ name: 'dashboard' })
   } catch (e) {
     errors.value = { form: (e as Error).message }

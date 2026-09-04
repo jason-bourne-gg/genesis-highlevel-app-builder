@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { ExternalLinkIcon, LoaderCircleIcon, RefreshCwIcon, UnplugIcon } from '@lucide/vue'
+import { ExternalLinkIcon, LoaderCircleIcon, PlugZapIcon, RefreshCwIcon, UnplugIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { buildPreview } from '@/lib/preview'
@@ -110,6 +110,23 @@ function openInTab() {
       >
         {{ tokenError }}
       </p>
+
+      <div
+        v-if="doc && !connected && !lost"
+        class="bg-background/95 absolute inset-0 grid place-items-center px-8 text-center backdrop-blur-sm"
+      >
+        <div class="max-w-xs space-y-3">
+          <PlugZapIcon class="text-muted-foreground mx-auto size-6" />
+          <p class="font-medium">No HighLevel data yet</p>
+          <p class="text-muted-foreground text-sm">
+            The app is running, but it has no location to read contacts or appointments from.
+          </p>
+          <Button size="sm" :disabled="connecting" @click="connect">
+            <LoaderCircleIcon v-if="connecting" class="animate-spin" />
+            Connect HighLevel
+          </Button>
+        </div>
+      </div>
 
       <div
         v-if="lost"

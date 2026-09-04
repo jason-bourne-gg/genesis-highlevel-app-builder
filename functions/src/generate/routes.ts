@@ -7,6 +7,7 @@ import { HL_CLIENT_SOURCE } from './hlClient'
 import { resolveModel, supportsAdaptiveThinking } from './models'
 import { FileStreamParser } from './parser'
 import { SYSTEM_PROMPT } from './prompt'
+import { asFiles, stripFence, validateShell } from './validate'
 import { loadContext, persist, type ProjectFile, type StoredMessage } from './store'
 
 // hl.js is ours, so the model may only ever write these three.
@@ -162,16 +163,14 @@ export const generate = onRequest(
 
     const written: ProjectFile[] = [...completed.entries()]
       .filter(([path]) => WRITABLE.has(path))
-      .map(([path, content]) => ({ path, content: content.replace(/^\n+/, '') }))
+      .map(([path, content]) => ({ path, content: stripFence(content) }))
 
     const merged = new Map(context.files.map((f) => [f.path, f.content]))
     for (const file of written) merged.set(file.path, file.content)
     merged.set(HL_PATH, HL_CLIENT_SOURCE)
 
     // Without index.html the preview has nothing to stitch together.
-    if (status === 'complete' && !merged.has('index.html')) {
-      failure = 'The model did not produce an index.html. Nothing was written.'
-    }
+    if (status === 'complete') failure = validateShell(merged)
 
     try {
       if (failure) {
@@ -184,7 +183,7 @@ export const generate = onRequest(
         })
         send({ type: 'error', message: failure })
       } else if (written.length) {
-        const files = [...merged.entries()].map(([path, content]) => ({ path, content }))
+        const files = asFiles(merged)
         await persist({
           projectId,
           prompt,

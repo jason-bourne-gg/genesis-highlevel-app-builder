@@ -22,10 +22,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { useDev } from '@/composables/useDev'
 import { useProjects } from '@/composables/useProjects'
+import { readOAuthResult } from '@/composables/useOAuthResult'
 
 const router = useRouter()
 const { projects, loading, create, remove } = useProjects()
 const { enabled: devMode } = useDev()
+
+readOAuthResult()
 
 const dialogOpen = ref(false)
 const creating = ref(false)

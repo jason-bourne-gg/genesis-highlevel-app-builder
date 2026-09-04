@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import type { CalendarEvent, Connection, Contact, Conversation } from '@/types'
 import * as hl from '@/services/highlevel'
+import { ApiError } from '@/services/api'
 import { useAuth } from './useAuth'
 
 const connection = ref<Connection>({ status: 'disconnected' })
@@ -45,6 +46,20 @@ export function useHighLevel() {
     await hl.disconnect()
   }
 
+  // A 401 from the proxy means HighLevel rejected the token, so the connection is
+  // dead until it is redone. Without this the "lost" state only ever came from the
+  // dev menu and a real expiry looked like an empty location.
+  const guard =
+    <T,>(call: () => Promise<T>) =>
+    async (): Promise<T> => {
+      try {
+        return await call()
+      } catch (e) {
+        if (e instanceof ApiError && e.code === 'connection_lost') dropConnection()
+        throw e
+      }
+    }
+
   function dropConnection() {
     if (connection.value.status !== 'connected') return
     connection.value = { ...connection.value, status: 'lost' }
@@ -58,9 +73,9 @@ export function useHighLevel() {
     connect,
     disconnect,
     dropConnection,
-    contacts: hl.listContacts,
-    conversations: hl.listConversations,
-    events: hl.listEvents,
+    contacts: guard(hl.listContacts),
+    conversations: guard(hl.listConversations),
+    events: guard(hl.listEvents),
   }
 }
 
