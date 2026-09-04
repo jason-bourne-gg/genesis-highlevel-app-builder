@@ -15,6 +15,9 @@ export const config = {
   get apiBase() { return process.env.HL_API_BASE ?? 'https://services.leadconnectorhq.com' },
   get apiVersion() { return process.env.HL_API_VERSION ?? '2021-07-28' },
   get appOrigin() { return process.env.APP_ORIGIN ?? 'http://localhost:6001' },
+
+  get anthropicKey() { return required('ANTHROPIC_API_KEY') },
+  get anthropicModel() { return process.env.ANTHROPIC_MODEL ?? 'claude-opus-5' },
 }
 
 export const AUTHORIZE_URL = 'https://marketplace.gohighlevel.com/v2/oauth/chooselocation'

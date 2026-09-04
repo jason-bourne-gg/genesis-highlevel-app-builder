@@ -7,6 +7,10 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    function ownsProject(projectId) {
+      return owner(get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid);
+    }
+
     // HighLevel tokens live here. Functions use the admin SDK and bypass rules;
     // nothing client-side ever reads them.
     match /users/{uid}/private/{doc} {
@@ -18,13 +22,34 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Both are function-only bookkeeping: an OAuth state is a one-time ticket and a
+    // preview token is a bearer credential. Readable by the browser, either would be
+    // a way to impersonate someone.
+    match /oauthStates/{nonce} {
+      allow read, write: if false;
+    }
+
+    match /previewTokens/{token} {
+      allow read, write: if false;
+    }
+
     match /projects/{projectId} {
       allow read: if owner(resource.data.ownerUid);
       allow create: if owner(request.resource.data.ownerUid);
       allow update, delete: if owner(resource.data.ownerUid);
 
-      match /{sub=**} {
-        allow read, write: if owner(get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid);
+      // Manual edits and restores are written straight from the browser; generation
+      // results are written by the function. Both land here, both are owner-scoped.
+      match /files/{fileId} {
+        allow read, write: if ownsProject(projectId);
+      }
+
+      match /messages/{messageId} {
+        allow read, write: if ownsProject(projectId);
+      }
+
+      match /snapshots/{snapshotId} {
+        allow read, write: if ownsProject(projectId);
       }
     }
   }
