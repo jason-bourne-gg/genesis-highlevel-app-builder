@@ -1,0 +1,133 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { LoaderCircleIcon, SparklesIcon } from '@lucide/vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useAuth } from '@/composables/useAuth'
+
+const props = defineProps<{ mode: 'signin' | 'signup' }>()
+
+const router = useRouter()
+const { pending, signIn, signUp } = useAuth()
+
+const email = ref('')
+const password = ref('')
+const confirm = ref('')
+const errors = ref<Record<string, string>>({})
+
+watch(
+  () => props.mode,
+  () => {
+    errors.value = {}
+    confirm.value = ''
+  },
+)
+
+async function submit() {
+  const found: Record<string, string> = {}
+  if (!email.value.trim()) found.email = 'Enter your email'
+  if (!password.value) found.password = 'Enter a password'
+  if (props.mode === 'signup' && confirm.value !== password.value) {
+    found.confirm = 'Passwords do not match'
+  }
+  errors.value = found
+  if (Object.keys(found).length) return
+
+  const run = props.mode === 'signin' ? signIn : signUp
+  try {
+    await run(email.value.trim(), password.value)
+    router.push({ name: 'dashboard' })
+  } catch (e) {
+    errors.value = { form: (e as Error).message }
+  }
+}
+</script>
+
+<template>
+  <div class="grid min-h-full lg:grid-cols-2">
+    <div
+      class="relative hidden flex-col justify-between border-r bg-linear-to-br from-violet-950/30 via-zinc-950 to-zinc-950 p-12 lg:flex"
+    >
+      <div class="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <SparklesIcon class="size-5 text-violet-400" />
+        Genesis
+      </div>
+      <div class="max-w-md space-y-4">
+        <p class="text-3xl leading-tight font-medium tracking-tight text-balance">
+          Describe the app. Watch it get written.
+        </p>
+        <p class="text-muted-foreground text-sm">
+          Genesis builds small internal tools straight onto your HighLevel location — contacts,
+          conversations and calendars, no glue code.
+        </p>
+      </div>
+      <p class="text-muted-foreground text-xs">Acme Dental &middot; sandbox location</p>
+    </div>
+
+    <div class="flex items-center justify-center p-6">
+      <form class="w-full max-w-sm space-y-6" novalidate @submit.prevent="submit">
+        <div class="space-y-1.5">
+          <h1 class="text-2xl font-semibold tracking-tight">
+            {{ mode === 'signin' ? 'Sign in' : 'Create an account' }}
+          </h1>
+          <p class="text-muted-foreground text-sm">
+            {{
+              mode === 'signin'
+                ? 'Welcome back.'
+                : 'Six characters or more for the password.'
+            }}
+          </p>
+        </div>
+
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <Label for="email">Email</Label>
+            <Input id="email" v-model="email" type="email" placeholder="you@clinic.com" autocomplete="email" />
+            <p v-if="errors.email" class="text-destructive text-xs">{{ errors.email }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="password">Password</Label>
+            <Input
+              id="password"
+              v-model="password"
+              type="password"
+              :autocomplete="mode === 'signin' ? 'current-password' : 'new-password'"
+            />
+            <p v-if="errors.password" class="text-destructive text-xs">{{ errors.password }}</p>
+          </div>
+
+          <div v-if="mode === 'signup'" class="space-y-2">
+            <Label for="confirm">Confirm password</Label>
+            <Input id="confirm" v-model="confirm" type="password" autocomplete="new-password" />
+            <p v-if="errors.confirm" class="text-destructive text-xs">{{ errors.confirm }}</p>
+          </div>
+        </div>
+
+        <p v-if="errors.form" class="text-destructive text-sm">{{ errors.form }}</p>
+
+        <Button type="submit" class="w-full" :disabled="pending">
+          <LoaderCircleIcon v-if="pending" class="animate-spin" />
+          {{ mode === 'signin' ? 'Sign in' : 'Create account' }}
+        </Button>
+
+        <p class="text-muted-foreground text-center text-sm">
+          <template v-if="mode === 'signin'">
+            No account?
+            <RouterLink to="/signup" class="text-foreground underline underline-offset-4">
+              Sign up
+            </RouterLink>
+          </template>
+          <template v-else>
+            Already have one?
+            <RouterLink to="/signin" class="text-foreground underline underline-offset-4">
+              Sign in
+            </RouterLink>
+          </template>
+        </p>
+      </form>
+    </div>
+  </div>
+</template>
