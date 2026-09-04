@@ -80,6 +80,8 @@ export interface CalendarEvent {
 }
 
 export type StreamEvent =
+  // Sent first, so the client knows which generation to cancel.
+  | { type: 'started'; generationId: string }
   | { type: 'text'; text: string }
   // Summarised model reasoning. Transient — it is shown while a generation runs
   // and never stored, which is why it is not part of Message.
