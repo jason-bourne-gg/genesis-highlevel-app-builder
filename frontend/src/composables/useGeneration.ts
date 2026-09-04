@@ -74,7 +74,9 @@ export function useGeneration(projectId: string) {
       for await (const event of streamGeneration(projectId, text, model.value, controller.signal)) {
         switch (event.type) {
           case 'status':
-            status.value = event.text
+            // Deltas, not whole summaries. Replacing them showed the last few
+            // characters flashing past instead of a readable thought.
+            status.value += event.text
             break
           case 'text':
             reply.content += event.text

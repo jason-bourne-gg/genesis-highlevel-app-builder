@@ -81,10 +81,10 @@ function onKeydown(event: KeyboardEvent) {
         <div v-if="messages.length" class="space-y-5 p-4">
           <ChatMessage v-for="message in messages" :key="message.id" :message="message" />
           <!-- Summarised model reasoning during the pause before the first file. -->
-          <p v-if="generating && status" class="text-primary flex items-center gap-2 text-xs italic">
-            <span class="bg-primary size-1.5 shrink-0 animate-pulse rounded-full" />
-            {{ status }}
-          </p>
+          <div v-if="generating && status" class="text-primary/85 flex gap-2 text-xs italic">
+            <span class="bg-primary mt-1.5 size-1.5 shrink-0 animate-pulse rounded-full" />
+            <p class="line-clamp-4 leading-relaxed">{{ status }}</p>
+          </div>
         </div>
 
         <div v-else class="space-y-4 p-4">
