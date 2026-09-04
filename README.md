@@ -17,6 +17,19 @@ location and show that business's data.
 The name and the brief are HighLevel's. This repository is my implementation, in
 Vue 3 and TypeScript on Firebase, with Claude through `@anthropic-ai/sdk`.
 
+## Screenshots
+
+![The generated app running on real HighLevel contacts](docs/screenshots/preview-real-data.png)
+*A dashboard written by Claude, running in a sandboxed frame, showing real contacts
+from a HighLevel sub-account.*
+
+| | |
+| --- | --- |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Generating](docs/screenshots/workspace-streaming.png) |
+| Projects and the HighLevel connection | Code streaming into the editor |
+
+---
+
 ## The user journey
 
 What actually happens, from the point of view of the person using it.
@@ -235,10 +248,14 @@ Two edges are load-bearing:
    dies. Two requests refreshing at the same moment would spend the same token and
    break the connection permanently. The transaction forces them into a queue.
 
-8. **The server saves the work, not the browser.** Files, messages and the version
-   snapshot are written server-side in one commit, even if the user closed the tab,
-   because the work is already paid for. The browser finds out by subscribing to
-   the database, so a second tab sees it too.
+8. **The server saves the work, and the connection is not a control channel.**
+   Files, messages and the version snapshot are written by the function, so closing
+   the tab mid-generation still saves what was produced. The same reasoning applies
+   to stopping: a browser hanging up does not reliably reach the container through
+   Cloud Run, so Stop is not a dropped connection but an explicit flag the function
+   watches for. Relying on the disconnect meant Stop appeared to work while the
+   generation ran on, overwrote the files and billed in full.
+
 
 9. **A file is saved only once its closing marker arrives.** Anything still open
    when the stream stops is a truncation, not a file, and is discarded. A run that
@@ -267,8 +284,11 @@ Two edges are load-bearing:
   conversations at 50, appointments at a 30-day forward window, with no paging and
   no cache beyond one page load. A busy location hits those ceilings immediately.
 
-- **A rate limit and a spend ceiling on generation.** Nothing stops one account
-  generating back to back until the Anthropic budget is gone.
+- **A spend ceiling, not just a spend meter.** Every generation now records its
+  token counts and dollar cost on the message, as a running project total, and as a
+  structured log entry. Nothing stops a user running generations back to back until
+  the budget is gone. Per-user and per-day limits are the missing half.
+
 
 - **Per-file restore and a diff view.** Restoring rewrites the whole file set in one
   commit, which is correct but blunt. Showing what changed between two versions is
