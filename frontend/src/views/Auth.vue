@@ -84,7 +84,7 @@ async function submit() {
       </div>
       <p class="text-muted-foreground flex items-center gap-2 text-xs">
         <span class="bg-highlight size-1.5 rounded-full" />
-        Acme Dental &middot; sandbox location
+        Your HighLevel credentials never reach the browser
       </p>
     </div>
 
