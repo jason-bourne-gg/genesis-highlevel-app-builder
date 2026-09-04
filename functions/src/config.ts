@@ -1,3 +1,9 @@
+import { defineSecret } from 'firebase-functions/params'
+
+// Held in Google Secret Manager, not in the function's environment config, so it
+// is encrypted at rest and does not show up in the Cloud Run service definition.
+export const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY')
+
 function required(name: string): string {
   const value = process.env[name]
   if (!value) throw new Error(`Missing environment variable ${name}`)
@@ -29,7 +35,7 @@ export const config = {
     return [...new Set([...configured, ...hosting])]
   },
 
-  get anthropicKey() { return required('ANTHROPIC_API_KEY') },
+  get anthropicKey() { return ANTHROPIC_API_KEY.value() },
   get anthropicModel() { return process.env.ANTHROPIC_MODEL ?? 'claude-opus-5' },
 }
 

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
-import { config } from '../config'
+import { ANTHROPIC_API_KEY, config } from '../config'
 import { isHlError } from '../errors'
 import { HL_CLIENT_SOURCE } from './hlClient'
 import { resolveModel, supportsAdaptiveThinking } from './models'
@@ -32,7 +32,7 @@ function userTurn(files: ProjectFile[], prompt: string): string {
 }
 
 export const generate = onRequest(
-  { cors: true, timeoutSeconds: 540, memory: '512MiB' },
+  { cors: true, timeoutSeconds: 540, memory: '512MiB', secrets: [ANTHROPIC_API_KEY] },
   async (req, res) => {
     if (req.method !== 'POST') return void res.status(405).json({ error: 'Use POST' })
 
