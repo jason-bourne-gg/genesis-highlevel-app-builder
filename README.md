@@ -310,8 +310,23 @@ at a Firebase Hosting path, for the reason in decision 1.
 
 **Environment variables.** Functions read `functions/.env`, bundled at deploy time,
 so a change means redeploying functions. Frontend values are compiled into the
-bundle, so a change means rebuilding and redeploying Hosting. Neither file is
-committed; `.env.example` documents both.
+bundle and are readable by anyone who opens the page, so nothing secret goes there.
+Neither file is committed; `.env.example` documents both.
+
+**The Anthropic key is not in either file.** Values in `functions/.env` are
+deployed as plaintext configuration on every function in the codebase, readable by
+anyone with access to the Google Cloud project. The model key lives in Google
+Secret Manager instead, encrypted at rest, granted only to the one function that
+needs it:
+
+```bash
+firebase functions:secrets:set ANTHROPIC_API_KEY
+```
+
+`generate` declares it with `defineSecret` and lists it in the function's `secrets`
+option, so it is mounted at runtime and never appears in the service definition.
+The HighLevel client secret is still an ordinary environment variable, which is the
+next thing to move.
 
 **Return origins need no configuration for the normal case.** The browser tells
 `oauthStart` where it is running, the server checks that against a list and stores
