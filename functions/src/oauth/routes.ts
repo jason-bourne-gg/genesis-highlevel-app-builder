@@ -11,9 +11,7 @@ import { claimState, mintState } from './state'
 export const oauthStart = onRequest({ cors: true }, async (req, res) => {
   try {
     const uid = await uidFrom(req)
-    // Wherever the app is running — localhost, web.app, a custom domain — is where
-    // the user gets sent back to. The Origin header is the fallback when the client
-    // does not say.
+    // The Origin header is the fallback when the client does not say where to return to.
     const origin = resolveReturnOrigin(String(req.query.returnTo ?? '') || req.get('Origin'))
     const url = new URL(AUTHORIZE_URL)
     url.searchParams.set('response_type', 'code')
@@ -29,11 +27,9 @@ export const oauthStart = onRequest({ cors: true }, async (req, res) => {
   }
 })
 
-// HighLevel redirects the browser here, so failures render as a redirect back to
-// the app rather than JSON the user would be staring at.
+// HighLevel redirects the browser here, so failures redirect back instead of rendering JSON.
 export const oauthCallback = onRequest(async (req, res) => {
-  // Starts as the default and narrows to the state's origin once it is known. A
-  // failure before that point still has somewhere sensible to land.
+  // Narrows to the state's origin once known; a failure before that still has somewhere to land.
   let origin = defaultOrigin()
 
   const back = (params: Record<string, string>) => {

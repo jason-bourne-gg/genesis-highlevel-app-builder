@@ -13,9 +13,7 @@ export interface PreviewGrant {
 
 const ref = (token: string) => getFirestore().doc(`previewTokens/${token}`)
 
-// An opaque random string looked up server-side, not a signed blob. It costs one
-// Firestore read per call and buys revocability and a much smaller thing to get
-// wrong than hand-rolled HMAC.
+// Opaque random string looked up server-side, not a signed blob: revocable and simpler.
 export async function mintPreviewToken(
   uid: string,
   projectId: string,

@@ -73,9 +73,7 @@ function onKeydown(event: KeyboardEvent) {
       <ScrollArea class="h-full">
         <div v-if="messages.length" class="space-y-5 p-4">
           <ChatMessage v-for="message in messages" :key="message.id" :message="message" />
-          <!-- Summarised model reasoning. Adaptive thinking means there is a real
-               pause before the first file arrives; this gives it something honest
-               to say instead of an idle spinner. -->
+          <!-- Summarised model reasoning during the pause before the first file. -->
           <p v-if="generating && status" class="text-primary flex items-center gap-2 text-xs italic">
             <span class="bg-primary size-1.5 shrink-0 animate-pulse rounded-full" />
             {{ status }}
@@ -136,8 +134,7 @@ function onKeydown(event: KeyboardEvent) {
           Enter to send &middot; Shift + Enter for a new line
         </p>
 
-        <!-- Which model writes the app. The server re-checks the id against its own
-             allowlist, so this is a preference, not a privilege. -->
+        <!-- The server re-checks the model id, so this is a preference, not a privilege. -->
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button

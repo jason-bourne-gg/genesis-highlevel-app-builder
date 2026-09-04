@@ -21,8 +21,7 @@ export interface ProjectContext {
   history: { role: 'user' | 'assistant'; content: string }[]
 }
 
-// Firestore document ids cannot contain "/", and deriving the id from the path
-// keeps writes idempotent — the same file always lands in the same document.
+// Firestore ids cannot contain "/", and deriving one from the path keeps writes idempotent.
 export const fileId = (path: string) => path.replace(/[^a-zA-Z0-9._-]/g, '_')
 
 const HISTORY_TURNS = 12

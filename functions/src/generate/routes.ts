@@ -9,8 +9,7 @@ import { FileStreamParser } from './parser'
 import { SYSTEM_PROMPT } from './prompt'
 import { loadContext, persist, type ProjectFile, type StoredMessage } from './store'
 
-// hl.js is ours and index.html is load-bearing for the preview, so the model is
-// only ever allowed to write these three.
+// hl.js is ours, so the model may only ever write these three.
 const WRITABLE = new Set(['index.html', 'app.js', 'styles.css'])
 const HL_PATH = 'hl.js'
 
@@ -36,8 +35,7 @@ export const generate = onRequest(
   async (req, res) => {
     if (req.method !== 'POST') return void res.status(405).json({ error: 'Use POST' })
 
-    // Everything that can fail cleanly fails before the stream opens, so the client
-    // gets a real status code instead of an error event on a 200.
+    // Fail before the stream opens, so the client gets a status code, not an error in a 200.
     let uid: string
     let projectId: string
     let prompt: string
@@ -47,8 +45,7 @@ export const generate = onRequest(
       const body = (req.body ?? {}) as { projectId?: string; prompt?: string; model?: string }
       projectId = String(body.projectId ?? '')
       prompt = String(body.prompt ?? '').trim()
-      // Falls back to the configured default rather than rejecting, so an old tab
-      // with a stale model id still works instead of failing the generation.
+      // Falls back to the default, so an old tab with a stale model id still works.
       model = resolveModel(body.model, config.anthropicModel)
       if (!projectId || !prompt) throw new Error('projectId and prompt are required')
     } catch (e) {
@@ -66,9 +63,7 @@ export const generate = onRequest(
 
     res.set('Content-Type', 'text/event-stream')
     res.set('Cache-Control', 'no-cache, no-transform')
-    // Belt and braces against an intermediary that buffers. The real fix is calling
-    // this function at its direct Cloud Run URL — Firebase Hosting buffers the whole
-    // response at the CDN and SSE never arrives through a rewrite.
+    // Firebase Hosting buffers responses at its CDN; SSE only works via the direct Cloud Run URL.
     res.set('X-Accel-Buffering', 'no')
     res.flushHeaders()
 
@@ -76,9 +71,7 @@ export const generate = onRequest(
       if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`)
     }
 
-    // Thinking happens before any text arrives, and that silence can outlast an
-    // idle-connection timeout somewhere in the middle. A comment frame is valid SSE
-    // and carries no event, so the client parser ignores it.
+    // Silence before the first text can outlast an idle-connection timeout somewhere.
     const heartbeat = setInterval(() => {
       if (!res.writableEnded) res.write(': ping\n\n')
     }, 15_000)
@@ -107,9 +100,7 @@ export const generate = onRequest(
           // Comfortably more than three small files need, and under Haiku's cap.
           max_tokens: 32000,
           system: SYSTEM_PROMPT,
-          // Summarised thinking gives the chat something honest to show during the
-          // pause before the first file, instead of dead air. Models without it
-          // simply start writing sooner, and the status line stays empty.
+          // Gives the chat something to show during the pause before the first file.
           ...(adaptive
             ? {
                 thinking: { type: 'adaptive' as const, display: 'summarized' as const },
@@ -160,15 +151,13 @@ export const generate = onRequest(
           prose += event.text
           send(event)
         }
-        // A file still open when the stream ends never got its closing tag, so it
-        // is not a file — it is a truncation. It is deliberately not committed.
+        // A file still open here was truncated, so it is deliberately not committed.
       }
     } catch (e) {
       if (!aborted) failure = (e as Error).message || 'The model request failed'
     }
 
-    // Whatever happened, decide what is safe to keep and write it. This runs even
-    // when the browser walked away — the work is already paid for.
+    // Runs even when the browser walked away — the work is already paid for.
     const status: StoredMessage['status'] = aborted ? 'stopped' : failure ? 'failed' : 'complete'
 
     const written: ProjectFile[] = [...completed.entries()]
@@ -179,8 +168,7 @@ export const generate = onRequest(
     for (const file of written) merged.set(file.path, file.content)
     merged.set(HL_PATH, HL_CLIENT_SOURCE)
 
-    // Without index.html there is nothing for the preview to stitch together, so a
-    // "successful" generation that lost it is a failed one.
+    // Without index.html the preview has nothing to stitch together.
     if (status === 'complete' && !merged.has('index.html')) {
       failure = 'The model did not produce an index.html. Nothing was written.'
     }

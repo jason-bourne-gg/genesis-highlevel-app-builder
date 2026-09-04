@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTheme } from '@/composables/useTheme'
 
-// The auth screens have no UserMenu, so this is the only way to change the theme
-// before signing in. Deliberately a single cycling button rather than a menu.
+// The auth screens have no UserMenu, so this is the only pre-sign-in theme control.
 const { theme, settings } = useTheme()
 
 const icon = computed(() =>

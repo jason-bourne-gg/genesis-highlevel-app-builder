@@ -16,15 +16,7 @@ export const config = {
   get apiVersion() { return process.env.HL_API_VERSION ?? '2021-07-28' },
   get appOrigin() { return process.env.APP_ORIGIN ?? 'http://localhost:6001' },
 
-  /**
-   * Where the browser may be sent after the OAuth round trip.
-   *
-   * The callback is a public URL, so whatever it redirects to has to be checked
-   * against a list or it becomes an open redirect. The two standard Firebase
-   * Hosting domains are derived from the project id the runtime already knows, so
-   * deploying to a new project needs no configuration; APP_ORIGINS covers custom
-   * domains and any extra local ports.
-   */
+  // Allowlist for the post-OAuth redirect: the public callback is otherwise an open redirect.
   get appOrigins(): string[] {
     const project = process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? ''
     const hosting = project

@@ -23,24 +23,14 @@ function heldProse(buffer: string): number {
   return buffer.indexOf('>', last) === -1 ? buffer.length - last : 0
 }
 
-/**
- * Splits one continuous model stream into prose and per-file token events.
- *
- * The only hard part is that a delimiter can straddle a chunk boundary — `</fi`
- * arriving at the end of one delta and `le>` at the start of the next. So the
- * parser never emits a tail that could still grow into a delimiter; it holds it
- * back until the next chunk proves otherwise. The result is identical whether the
- * model's output arrives in one piece or one character at a time.
- */
+// Splits the stream into prose and file events, holding back any tail that could still
+// grow into a delimiter — so a delimiter straddling a chunk boundary parses the same.
 export class FileStreamParser {
   private buffer = ''
   private current: string | null = null
-  // The newline after an opening tag is layout, not file content — but it may not
-  // arrive in the same chunk as the tag, so it is stripped here rather than in the
-  // regex, where it would depend on where the chunk happened to land.
+  // The newline after an opening tag is layout, not content, and may land in a later chunk.
   private atFileStart = false
-  // Likewise, whitespace between one `</file>` and the next `<file>` is separator,
-  // not prose. Without this the chat fills with blank lines mid-generation.
+  // Whitespace between one `</file>` and the next `<file>` is separator, not prose.
   private betweenFiles = false
 
   get openPath(): string | null {
@@ -58,8 +48,7 @@ export class FileStreamParser {
   }
 
   private body(raw: string): ParseEvent[] {
-    // Guard first: an empty slice must not consume the pending newline strip, or a
-    // chunk that ends exactly on the opening tag's `>` leaves a stray blank line.
+    // Guard first: an empty slice must not consume the pending newline strip.
     if (!raw) return []
     let text = raw
     if (this.atFileStart) {
@@ -109,8 +98,7 @@ export class FileStreamParser {
     }
   }
 
-  // Whatever is left when the model stops. An unclosed file stays unclosed —
-  // the caller decides that a file without its closing tag was never finished.
+  // An unclosed file stays unclosed; the caller treats a missing close tag as truncation.
   end(): ParseEvent[] {
     const rest = this.buffer
     this.buffer = ''

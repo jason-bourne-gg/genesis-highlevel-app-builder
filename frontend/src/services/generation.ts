@@ -1,21 +1,12 @@
 import type { StreamEvent } from '@/types'
 import { idToken } from './auth'
 
-// Not Firebase Hosting. Hosting buffers the entire response at its CDN before
-// sending anything, so an event stream routed through a rewrite arrives all at
-// once, at the end — which is to say, it does not stream at all. This is the
-// function's direct Cloud Run URL.
+// Firebase Hosting buffers the whole response at its CDN, so this is the direct Cloud Run URL.
 const GENERATE_URL = import.meta.env.VITE_GENERATE_URL
 
 export class GenerationError extends Error {}
 
-/**
- * Streams one generation.
- *
- * Uses fetch + ReadableStream rather than EventSource, which cannot send an
- * Authorization header — and the endpoint has to know who is asking, because it
- * reads and writes that user's project.
- */
+// fetch + ReadableStream rather than EventSource, which cannot send an Authorization header.
 export async function* streamGeneration(
   projectId: string,
   prompt: string,
@@ -36,8 +27,7 @@ export async function* streamGeneration(
     body: JSON.stringify({ projectId, prompt, model }),
   })
 
-  // Anything that could be decided before the model was called comes back as a
-  // normal status code, not as an error event inside a 200.
+  // Pre-stream failures arrive as a status code, not as an error event inside a 200.
   if (!res.ok || !res.body) {
     const body = (await res.json().catch(() => ({}))) as { error?: string }
     throw new GenerationError(body.error ?? `Generation failed (${res.status})`)
@@ -54,8 +44,7 @@ export async function* streamGeneration(
 
       buffer += decoder.decode(value, { stream: true })
 
-      // SSE frames are separated by a blank line. A frame can arrive in pieces,
-      // so only whole frames are taken off the buffer.
+      // SSE frames are separated by a blank line, and one can arrive in pieces.
       let split = buffer.indexOf('\n\n')
       while (split !== -1) {
         const frame = buffer.slice(0, split)
@@ -77,8 +66,7 @@ export async function* streamGeneration(
       }
     }
   } finally {
-    // Stopping means the user pressed stop. Releasing the reader closes the
-    // connection, which is what tells the function to abort the model call.
+    // Releasing the reader closes the connection, which tells the function to abort.
     await reader.cancel().catch(() => {})
   }
 }

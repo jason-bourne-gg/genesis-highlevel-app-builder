@@ -10,9 +10,7 @@ let stop: (() => void) | null = null
 
 const { user } = useAuth()
 
-// One subscription for the whole app, re-pointed when the signed-in user changes.
-// Without the teardown a signed-out session keeps a listener open on rules that
-// no longer permit it, which surfaces as permission-denied noise in the console.
+// Without the teardown a signed-out session keeps a listener open on rules that now deny it.
 watch(
   user,
   (next) => {
@@ -39,13 +37,11 @@ export function useProjects() {
 
   async function create(name: string, description: string) {
     if (!user.value) throw new Error('Not signed in')
-    // Stamped at creation rather than read live, so the project keeps pointing at
-    // the sub-account it was actually built for.
+    // Stamped at creation, so the project keeps pointing at the sub-account it was built for.
     return store.createProject(user.value.id, name, description, connection.value.locationId ?? '')
   }
 
-  // No local splice: the subscription reports the removal. Doing both would make
-  // the card flicker back in if the write failed.
+  // No local splice: the subscription reports the removal.
   const remove = (id: string) => store.deleteProject(id)
 
   return { projects, loading, create, remove }

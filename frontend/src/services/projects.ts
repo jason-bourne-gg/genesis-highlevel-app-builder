@@ -13,12 +13,10 @@ import {
 import { db } from '@/lib/firebase'
 import type { Message, Project, ProjectFile, Snapshot } from '@/types'
 
-// Must match fileId() in functions/src/generate/store.ts — the same path has to
-// resolve to the same document whether the browser or the generator writes it.
+// Must match fileId() in functions/src/generate/store.ts.
 export const fileId = (path: string) => path.replace(/[^a-zA-Z0-9._-]/g, '_')
 
-// The tree reads top-down: the shell, the app, its styles, then the client we
-// inject. Firestore has no inherent order, so one is imposed here.
+// Firestore has no inherent order, so the file tree's order is imposed here.
 const ORDER = ['index.html', 'app.js', 'styles.css', 'hl.js']
 
 export function sortFiles(files: ProjectFile[]): ProjectFile[] {
@@ -32,17 +30,8 @@ export function sortFiles(files: ProjectFile[]): ProjectFile[] {
 const projects = collection(db, 'projects')
 const sub = (projectId: string, name: string) => collection(db, 'projects', projectId, name)
 
-// Live subscriptions everywhere rather than one-shot reads: the generation function
-// writes the canonical result server-side, and this is how the browser learns about
-// it — including in a second tab, or after the tab that started it was closed.
-//
-// The query filters on ownerUid alone, then hides soft-deleted projects and orders
-// by recency here rather than in Firestore. Adding `where(deletedAt)` and
-// `orderBy(updatedAt)` to the query would need a composite index, which has to be
-// deployed and finish building before the dashboard renders at all. This is one
-// person's project list — tens of documents — so the sort is free in the browser
-// and the app has one less piece of infrastructure it cannot start without. If the
-// list ever needs paging, the index goes in and the ordering moves back to the query.
+// The deletedAt filter and the sort stay in the browser to avoid a composite index the
+// dashboard would have to wait on before it could render at all.
 export function watchProjects(uid: string, onChange: (list: Project[]) => void): () => void {
   return onSnapshot(query(projects, where('ownerUid', '==', uid)), (snap) => {
     onChange(
@@ -93,15 +82,13 @@ export async function createProject(
     locationId,
     createdAt: now,
     updatedAt: now,
-    // Explicitly null rather than absent: the dashboard query filters on it, and a
-    // missing field would drop the project out of the list entirely.
+    // Explicit null rather than absent: the dashboard query filters on this field.
     deletedAt: null,
   })
   return { id: ref.id, name, description, locationId, createdAt: now, updatedAt: now }
 }
 
-// Soft delete. Subcollections would have to be walked to hard-delete, and a
-// mis-click costing someone their generation history is a worse outcome.
+// Soft delete: a hard delete would have to walk subcollections, and a mis-click costs history.
 export function deleteProject(id: string): Promise<void> {
   return updateDoc(doc(projects, id), { deletedAt: Date.now() })
 }
@@ -164,8 +151,7 @@ export async function saveFile(projectId: string, file: ProjectFile): Promise<vo
   await batch.commit()
 }
 
-// Restoring rewrites the whole set in one commit, so the preview can never render
-// a half-restored app.
+// One commit, so the preview can never render a half-restored app.
 export async function restoreFiles(projectId: string, files: ProjectFile[]): Promise<void> {
   const batch = writeBatch(db)
   const now = Date.now()

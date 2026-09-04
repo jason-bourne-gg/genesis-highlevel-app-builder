@@ -9,10 +9,7 @@ export interface ModelOption {
   cost: string
 }
 
-// Labels and cost hints for the picker. The list that actually decides what is
-// allowed is ALLOWED_MODELS in functions/src/generate/models.ts — the browser
-// cannot be trusted with a model id, so the server validates independently and
-// falls back to its configured default if it does not recognise one.
+// Labels only; ALLOWED_MODELS in functions/src/generate/models.ts is what actually decides.
 export const MODELS: ModelOption[] = [
   {
     id: 'claude-opus-5',
@@ -36,8 +33,7 @@ export const MODELS: ModelOption[] = [
 
 const DEFAULT = 'claude-sonnet-5'
 
-// A preference, not project state: it belongs to the person, not the app they are
-// building, so it stays in localStorage rather than Firestore.
+// A preference of the person, not the project, so it lives in localStorage.
 const stored = read('model', DEFAULT)
 const model = ref(MODELS.some((m) => m.id === stored) ? stored : DEFAULT)
 

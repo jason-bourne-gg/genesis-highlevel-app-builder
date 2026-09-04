@@ -13,9 +13,7 @@ import { useHighLevel } from '@/composables/useHighLevel'
 
 const { connected, dropConnection } = useHighLevel()
 
-// The generation failure modes that used to live here belonged to the mock
-// generator. Against the real model an interrupted stream is the Stop button and a
-// model failure arrives as an error event, so both are exercised on the real path.
+// Stream interruption and model failure are exercised on the real path, so only this is left.
 function breakConnection() {
   dropConnection()
   toast.warning('HighLevel connection dropped')

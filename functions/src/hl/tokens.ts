@@ -66,8 +66,7 @@ export function refreshTokens(refreshToken: string): Promise<HlTokens> {
   return post({ grant_type: 'refresh_token', refresh_token: refreshToken })
 }
 
-// HighLevel refresh tokens are single use — a second concurrent refresh with the same
-// token invalidates the connection permanently. The transaction serialises them.
+// HighLevel refresh tokens are single use, so the transaction serialises concurrent refreshes.
 export async function accessTokenFor(uid: string): Promise<HlTokens> {
   const db = getFirestore()
   const doc = ref(uid)

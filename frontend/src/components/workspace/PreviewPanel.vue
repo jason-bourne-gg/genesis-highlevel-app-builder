@@ -17,8 +17,7 @@ const doc = ref('')
 const frame = ref(0)
 const tokenError = ref('')
 
-// A fresh token per render. It is short lived and scoped to this project, so it
-// never outlives the frame it was minted for.
+// A fresh token per render: short lived and scoped to this project.
 async function refresh() {
   tokenError.value = ''
   let token = ''
@@ -37,13 +36,10 @@ async function refresh() {
 }
 
 watch(previewRevision, refresh, { immediate: true })
-// Connecting HighLevel after a generation should light the preview up without
-// making the user press reload.
+// Connecting HighLevel after a generation should light the preview up without a reload.
 watch(connected, refresh)
 
-// A blob: URL would inherit this origin, letting generated code read the Firebase
-// session out of IndexedDB. Open a bare shell instead and sandbox the app inside it,
-// matching the in-page preview.
+// A blob: URL would inherit this origin, letting generated code read the Firebase session.
 function openInTab() {
   const win = window.open('', '_blank')
   if (!win) return
