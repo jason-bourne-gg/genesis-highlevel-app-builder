@@ -122,6 +122,7 @@ export function watchMessages(projectId: string, onChange: (messages: Message[])
           createdAt: Number(data.createdAt ?? 0),
           status: (data.status ?? 'complete') as Message['status'],
           error: data.error ? String(data.error) : undefined,
+          usage: data.usage as Message['usage'],
         }
       }),
     )
