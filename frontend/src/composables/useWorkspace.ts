@@ -47,11 +47,16 @@ function create(projectId: string) {
     parkedMessages = null
   })
 
-  const ready = store.getProject(projectId).then((p) => {
-    project.value = p
-    loading.value = false
-    return p
-  })
+  // A denied or offline read must still settle, or the workspace hangs on "Loading…"
+  // and every later await on this promise rejects for the rest of the session.
+  const ready = store
+    .getProject(projectId)
+    .catch(() => null)
+    .then((found) => {
+      project.value = found
+      loading.value = false
+      return found
+    })
 
   // In-memory only while streaming; the generation function is the writer.
   function writeFile(path: string, content: string) {

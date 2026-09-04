@@ -11,8 +11,7 @@ service cloud.firestore {
       return owner(get(/databases/$(database)/documents/projects/$(projectId)).data.ownerUid);
     }
 
-    // HighLevel tokens live here. Functions use the admin SDK and bypass rules;
-    // nothing client-side ever reads them.
+    // HighLevel tokens. Functions use the admin SDK and bypass rules.
     match /users/{uid}/private/{doc} {
       allow read, write: if false;
     }
@@ -22,9 +21,8 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Both are function-only bookkeeping: an OAuth state is a one-time ticket and a
-    // preview token is a bearer credential. Readable by the browser, either would be
-    // a way to impersonate someone.
+    // Both are bearer credentials. Readable by a browser, either would let someone
+    // impersonate another user.
     match /oauthStates/{nonce} {
       allow read, write: if false;
     }
@@ -36,20 +34,26 @@ service cloud.firestore {
     match /projects/{projectId} {
       allow read: if owner(resource.data.ownerUid);
       allow create: if owner(request.resource.data.ownerUid);
-      allow update, delete: if owner(resource.data.ownerUid);
+      allow delete: if owner(resource.data.ownerUid);
+      // Pinning ownerUid stops a project being handed to another account.
+      allow update: if owner(resource.data.ownerUid)
+                    && request.resource.data.ownerUid == resource.data.ownerUid;
 
-      // Manual edits and restores are written straight from the browser; generation
-      // results are written by the function. Both land here, both are owner-scoped.
+      // Manual edits and restores are written straight from the browser.
       match /files/{fileId} {
         allow read, write: if ownsProject(projectId);
       }
 
+      // Written only by the generation function through the admin SDK. Client write
+      // access would let someone rewrite the history fed back to the model.
       match /messages/{messageId} {
-        allow read, write: if ownsProject(projectId);
+        allow read: if ownsProject(projectId);
+        allow write: if false;
       }
 
       match /snapshots/{snapshotId} {
-        allow read, write: if ownsProject(projectId);
+        allow read: if ownsProject(projectId);
+        allow write: if false;
       }
     }
   }

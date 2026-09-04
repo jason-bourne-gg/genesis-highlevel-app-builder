@@ -8,7 +8,8 @@ import { clearTokens } from './tokens'
 const resourceOf = (path: string) => path.replace(/^\/+|\/+$/g, '').split('/').pop() ?? ''
 
 export const hlProxy = onRequest({ cors: true }, async (req, res) => {
-  const handler = resources[resourceOf(req.path)]
+  const resource = resourceOf(req.path)
+  const handler = Object.hasOwn(resources, resource) ? resources[resource] : undefined
   if (!handler) return void res.status(404).json({ error: `Unknown resource ${req.path}` })
 
   try {
