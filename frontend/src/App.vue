@@ -4,9 +4,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useTheme } from '@/composables/useTheme'
 
-// Touching the singleton here guarantees the theme is applied and the
-// prefers-color-scheme listener is attached on every route, including the auth
-// screens, which have no UserMenu of their own.
+// Applies the theme on every route, including auth, which has no UserMenu.
 const { resolved } = useTheme()
 </script>
 

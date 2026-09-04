@@ -4,8 +4,7 @@ import { isHlError } from '../errors'
 import { resources } from '../hl/resources'
 import { claimPreviewToken, mintPreviewToken } from './tokens'
 
-// Mints the credential the sandboxed preview uses. Requires a real Firebase login,
-// so a token can only ever be issued for the caller's own project.
+// Requires a real Firebase login, so a token is only ever issued for the caller's own project.
 export const previewToken = onRequest({ cors: true }, async (req, res) => {
   try {
     const uid = await uidFrom(req)
@@ -17,10 +16,8 @@ export const previewToken = onRequest({ cors: true }, async (req, res) => {
   }
 })
 
-// The generated app runs in a sandbox without allow-same-origin, so it is on an
-// opaque origin and sends `Origin: null`. Reflecting that origin is brittle, so
-// this route allows any origin outright — safe here because the only credential is
-// the preview token in a header, and no cookies are involved.
+// The sandboxed preview is on an opaque origin and sends `Origin: null`, so any origin is
+// allowed — safe because the only credential is a header token and no cookies are involved.
 export const hlPreview = onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*')
   res.set('Access-Control-Allow-Headers', 'X-Preview-Token, Content-Type')

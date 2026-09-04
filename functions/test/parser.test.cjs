@@ -1,16 +1,12 @@
-// The stream parser is the one piece of this project where a bug is invisible:
-// a delimiter split across a chunk boundary corrupts a file quietly. So it is
-// tested against every possible split point, not a couple of hand-picked ones.
-//
-//   npm run build && npm test
+// Every split point, not a hand-picked few: a delimiter split across a chunk boundary
+// corrupts a file silently. Run with `npm run build && npm test`.
 const assert = require('node:assert')
 const { FileStreamParser } = require('../lib/generate/parser.js')
 
 const SOURCE =
   'Building it now.\n\n' +
   '<file path="index.html">\n<!doctype html>\n<div id="app"></div>\n</file>\n' +
-  // A file whose body contains both a bare `<` and the closing tag split across
-  // a string concatenation — the two things a naive split() would get wrong.
+  // A bare `<` and a closing tag split across a concatenation: what a naive split() gets wrong.
   '<file path="app.js">\nconst x = a < b\nconst s = "</fil" + "e>"\n</file>\n' +
   '<file path="styles.css">\nbody { margin: 0 }\n</file>\n' +
   '\nDone — three files.'
@@ -48,8 +44,7 @@ for (let i = 1; i < SOURCE.length; i++) {
 }
 assert.deepStrictEqual(run([...SOURCE]), whole, 'one character at a time')
 
-// A file the stream died inside never gets a close event, so the caller can tell
-// a finished file from a truncated one and refuse to commit the truncation.
+// A file the stream died inside never gets a close event, so the caller can refuse it.
 const truncated = run([SOURCE.slice(0, SOURCE.indexOf('const s'))])
 assert.deepStrictEqual(truncated.closed, ['index.html'])
 

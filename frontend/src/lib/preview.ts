@@ -4,23 +4,14 @@ import { functionsBase } from '@/lib/firebase'
 const contentOf = (files: ProjectFile[], path: string) =>
   files.find((f) => f.path === path)?.content ?? ''
 
-// The generated app's hl.js is stored with placeholders, which is what the editor
-// shows. The credential itself is substituted here, at render time, and lives only
-// in the srcdoc of one iframe.
+// hl.js is stored with placeholders; the credential is substituted here, per render.
 function fillClient(source: string, token: string): string {
   return source
     .replace(/__PREVIEW_BASE__/g, () => functionsBase)
     .replace(/__PREVIEW_TOKEN__/g, () => token)
 }
 
-/**
- * Stitches the project's files into one document for the iframe.
- *
- * The generated app is four separate files in Firestore — separately edited,
- * separately versioned — but there is no bundler, so they are concatenated by
- * replacing the tags that reference them. index.html is load-bearing: without it
- * there is nothing to stitch into.
- */
+// No bundler: the files are inlined by replacing the tags that reference them.
 export function buildPreview(files: ProjectFile[], previewToken = ''): string {
   const html = contentOf(files, 'index.html')
   if (!html) return ''

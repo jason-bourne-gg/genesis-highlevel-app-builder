@@ -4,9 +4,7 @@ import { read, write } from '@/lib/local'
 export type ThemeSetting = 'light' | 'dark' | 'system'
 export type ResolvedTheme = 'light' | 'dark'
 
-// Kept in sync, byte for byte, with the pre-paint script in index.html. If the
-// key or the encoding changes here it has to change there too, or the first
-// frame will disagree with the app.
+// Must stay byte-for-byte in sync with the pre-paint script in index.html.
 const KEY = 'theme'
 
 const settings: ThemeSetting[] = ['light', 'dark', 'system']
@@ -38,8 +36,7 @@ watch(
   (mode) => {
     const root = document.documentElement
     root.classList.toggle('dark', mode === 'dark')
-    // The pre-paint script in index.html sets this inline too; keep the two in
-    // step so form controls and scrollbars follow a live toggle.
+    // The pre-paint script sets this inline too; keep the two in step on a live toggle.
     root.style.colorScheme = mode
   },
   { immediate: true },

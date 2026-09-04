@@ -1,7 +1,6 @@
 const prefix = 'genesis:'
 
-// Only ever used for UI preferences. Nothing here is authoritative — the app's
-// state lives in Firestore.
+// UI preferences only; nothing here is authoritative.
 export function read<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(prefix + key)

@@ -1,11 +1,6 @@
-// The HighLevel client every generated app gets. We write it, not the model — a
-// narrow, documented surface is what stops Claude inventing endpoints, and it keeps
-// the real access token on the server where the sandbox can never reach it.
-//
-// Both placeholders are substituted by the browser at render time, not stored:
-// the preview token is short-lived and minted per render.
-export const HL_CLIENT_SOURCE = `// Injected by Genesis. Talks to the Genesis proxy, never to HighLevel directly —
-// the sandbox has no HighLevel credentials and could not use them if it did.
+// The HighLevel client every generated app gets. We write it, not the model, so the surface
+// stays narrow and the real access token never leaves the server.
+export const HL_CLIENT_SOURCE = `// Injected by Genesis. Talks to the Genesis proxy, never to HighLevel directly.
 (function () {
   var BASE = '__PREVIEW_BASE__'
   var TOKEN = '__PREVIEW_TOKEN__'
@@ -21,7 +16,6 @@ export const HL_CLIENT_SOURCE = `// Injected by Genesis. Talks to the Genesis pr
           return body
         })
       }).catch(function (err) {
-        // Let the next call retry rather than caching the failure forever.
         delete cache[resource]
         throw err
       })

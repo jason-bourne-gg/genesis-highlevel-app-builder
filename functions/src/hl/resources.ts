@@ -1,9 +1,7 @@
 import { hlGet } from './client'
 import { accessTokenFor } from './tokens'
 
-// HighLevel's field names differ from ours and vary by endpoint. Normalising here —
-// once, on the server — means the dashboard and every generated app see the same
-// shape, and the system prompt can describe a schema that is actually true.
+// HighLevel's field names vary by endpoint, so responses are normalised here into one shape.
 const str = (v: unknown, fallback = '') => (v == null ? fallback : String(v))
 
 const EVENT_WINDOW_DAYS = 30
@@ -80,8 +78,7 @@ export async function conversations(uid: string): Promise<{ conversations: Conve
 }
 
 export async function events(uid: string): Promise<{ events: CalendarEvent[] }> {
-  // Events are calendar-scoped, not location-scoped, so the calendars have to be
-  // resolved first and the results merged.
+  // Events are calendar-scoped, not location-scoped, so calendars are resolved first.
   const { calendars = [] } = await hlGet<{ calendars?: { id: string }[] }>(uid, '/calendars/')
   const window = {
     startTime: String(Date.now()),

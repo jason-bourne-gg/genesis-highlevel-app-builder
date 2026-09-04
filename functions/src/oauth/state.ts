@@ -6,9 +6,7 @@ const TTL_MS = 10 * 60 * 1000
 
 export interface OAuthState {
   uid: string
-  // Vetted against the allowlist when the flow started, so the callback can use it
-  // as-is. Storing it here rather than passing it through HighLevel means the round
-  // trip cannot be talked into redirecting somewhere else.
+  // Stored server-side rather than passed through HighLevel, so the round trip cannot move it.
   origin: string
   createdAt: number
 }

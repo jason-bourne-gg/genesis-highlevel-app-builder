@@ -137,7 +137,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown))
               : 'text-muted-foreground hover:text-foreground'
           "
         >
-          <!-- The active tab is the one accent that stays lit in the editor. -->
           <span
             v-if="active === tab"
             class="from-primary to-highlight absolute inset-x-0 top-0 h-0.5 bg-linear-to-r"

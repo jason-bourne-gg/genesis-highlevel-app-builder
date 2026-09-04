@@ -10,15 +10,11 @@ function create(projectId: string) {
   const snapshots = ref<Snapshot[]>([])
   const loading = ref(true)
 
-  // Bumped when files change; the preview tracks its own counter so an aborted
-  // generation doesn't replace a working app with half a file.
+  // The preview tracks its own counter so an aborted generation can't replace a working app.
   const revision = ref(0)
   const previewRevision = ref(0)
 
-  // While a generation runs, the tokens arriving over SSE are the freshest view of
-  // the files — the function only writes to Firestore once it has finished. So
-  // remote updates are parked until the stream ends, then applied in one go. That
-  // final apply is what reconciles the browser with what was actually saved.
+  // The stream is fresher than Firestore until it ends, so remote updates are parked.
   const streaming = ref(false)
   let parkedFiles: ProjectFile[] | null = null
   let parkedMessages: Message[] | null = null
@@ -57,8 +53,7 @@ function create(projectId: string) {
     return p
   })
 
-  // Local, in-memory edits used while streaming. Nothing here is persisted — the
-  // generation function is the writer.
+  // In-memory only while streaming; the generation function is the writer.
   function writeFile(path: string, content: string) {
     const existing = files.value.find((f) => f.path === path)
     if (existing) existing.content = content
@@ -110,8 +105,7 @@ export type Workspace = ReturnType<typeof create>
 
 const open = new Map<string, Workspace>()
 
-// Signing out revokes the rules that these listeners depend on, so they have to go
-// with the session — otherwise every open subscription starts erroring.
+// Signing out revokes the rules these listeners depend on, so they go with the session.
 const { user } = useAuth()
 watch(user, (next) => {
   if (next) return

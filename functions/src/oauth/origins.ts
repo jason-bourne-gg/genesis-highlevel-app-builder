@@ -1,7 +1,6 @@
 import { config } from '../config'
 
-// Compares scheme, host and port, not a string prefix. "https://evil.com/?x=
-// https://genesysbe-cbd7e.web.app" must not pass, and startsWith would let it.
+// Compares scheme, host and port: startsWith would let "https://evil.com/?x=<ours>" pass.
 function normalise(value: string): string | null {
   try {
     return new URL(value).origin
@@ -14,15 +13,7 @@ export function defaultOrigin(): string {
   return config.appOrigins[0] ?? config.appOrigin
 }
 
-/**
- * The origin to return the browser to once HighLevel is done with it.
- *
- * Resolved when the flow starts, from where the request actually came, and
- * checked against the allowlist there — so by the time the public callback runs,
- * the destination has already been vetted and stored server side. An unrecognised
- * origin falls back to the default rather than failing: a working connection that
- * lands on the wrong tab beats a dead end.
- */
+// Vetted when the flow starts, so the public callback can use the stored origin as-is.
 export function resolveReturnOrigin(candidate: string | undefined): string {
   const origin = normalise(candidate ?? '')
   if (!origin) return defaultOrigin()

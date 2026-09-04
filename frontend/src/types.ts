@@ -7,9 +7,7 @@ export interface Project {
   id: string
   name: string
   description: string
-  // The HighLevel location this project was created against. Recorded at creation
-  // so a project stays associated with one sub-account's data even if the user
-  // later reconnects to a different one.
+  // Stamped at creation, so the project stays tied to one sub-account.
   locationId: string
   createdAt: number
   updatedAt: number
