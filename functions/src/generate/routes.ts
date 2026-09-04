@@ -79,7 +79,9 @@ export const generate = onRequest(
 
     const controller = new AbortController()
     let aborted = false
-    req.on('close', () => {
+    // req has already ended by the time this handler runs, so req's 'close' never
+    // fires. res 'close' is what reports the client hanging up mid-stream.
+    res.on('close', () => {
       if (res.writableEnded) return
       aborted = true
       controller.abort()
@@ -147,6 +149,13 @@ export const generate = onRequest(
         }
       }
 
+      const final = await stream.finalMessage().catch(() => null)
+      if (final?.stop_reason === 'max_tokens') {
+        failure = 'The model ran out of room before finishing. Nothing was written — try a smaller change.'
+      } else if (final?.stop_reason === 'refusal') {
+        failure = 'The model declined to write this. Try rewording the request.'
+      }
+
       for (const event of parser.end()) {
         if (event.type === 'text') {
           prose += event.text
@@ -170,7 +179,7 @@ export const generate = onRequest(
     merged.set(HL_PATH, HL_CLIENT_SOURCE)
 
     // Without index.html the preview has nothing to stitch together.
-    if (status === 'complete') failure = validateShell(merged)
+    if (status === 'complete') failure = validateShell(merged, new Set(written.map((f) => f.path)))
 
     try {
       if (failure) {
@@ -202,6 +211,7 @@ export const generate = onRequest(
       }
     } catch (e) {
       send({ type: 'error', message: `Could not save the generation: ${(e as Error).message}` })
+      failure = failure ?? 'Could not save the generation'
     }
 
     clearInterval(heartbeat)

@@ -67,19 +67,41 @@ export function refreshTokens(refreshToken: string): Promise<HlTokens> {
 }
 
 // HighLevel refresh tokens are single use, so the transaction serialises concurrent refreshes.
+// A Firestore transaction gives optimistic concurrency at commit, but it does not
+// stop two callers making the refresh POST at the same time — and a HighLevel
+// refresh token dies on first use, so the loser breaks the connection for good.
+// One resource request fans out over every calendar, so this is the common case,
+// not a rare one. Sharing the in-flight promise collapses them into one refresh.
+const inFlight = new Map<string, Promise<HlTokens>>()
+
+const stripEmpty = (t: HlTokens): Partial<HlTokens> =>
+  Object.fromEntries(Object.entries(t).filter(([, v]) => v !== '' && v !== undefined))
+
 export async function accessTokenFor(uid: string): Promise<HlTokens> {
+  const pending = inFlight.get(uid)
+  if (pending) return pending
+
   const db = getFirestore()
   const doc = ref(uid)
 
-  return db.runTransaction(async (tx) => {
+  const run = db.runTransaction(async (tx) => {
     const snap = await tx.get(doc)
     if (!snap.exists) throw new HlError('not_connected', 'No HighLevel connection', 412)
 
     const tokens = snap.data() as HlTokens
     if (tokens.expiresAt - Date.now() > REFRESH_MARGIN_MS) return tokens
 
-    const fresh = await refreshTokens(tokens.refreshToken)
+    // A refresh response can omit locationId. Replacing the document would blank it
+    // and every later request would send locationId= empty.
+    const fresh = { ...tokens, ...stripEmpty(await refreshTokens(tokens.refreshToken)) }
     tx.set(doc, fresh)
     return fresh
   })
+
+  inFlight.set(uid, run)
+  try {
+    return await run
+  } finally {
+    inFlight.delete(uid)
+  }
 }

@@ -18,15 +18,15 @@ export function buildPreview(files: ProjectFile[], previewToken = ''): string {
 
   return html
     .replace(
-      /<link[^>]+href=["']styles\.css["'][^>]*>/i,
+      /<link[^>]+href=["'](?:\.\/)?styles\.css["'][^>]*>/i,
       () => `<style>\n${contentOf(files, 'styles.css')}\n</style>`,
     )
     .replace(
-      /<script[^>]+src=["']hl\.js["'][^>]*>\s*<\/script>/i,
+      /<script[^>]+src=["'](?:\.\/)?hl\.js["'][^>]*>\s*<\/script>/i,
       () => `<script>\n${fillClient(contentOf(files, 'hl.js'), previewToken)}\n</script>`,
     )
     .replace(
-      /<script[^>]+src=["']app\.js["'][^>]*>\s*<\/script>/i,
+      /<script[^>]+src=["'](?:\.\/)?app\.js["'][^>]*>\s*<\/script>/i,
       () => `<script type="module">\n${contentOf(files, 'app.js')}\n</script>`,
     )
 }

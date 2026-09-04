@@ -2,7 +2,7 @@ import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
 import { isHlError } from '../errors'
 import { resources } from '../hl/resources'
-import { claimPreviewToken, mintPreviewToken } from './tokens'
+import { assertOwns, claimPreviewToken, mintPreviewToken, sweepExpired } from './tokens'
 
 // Requires a real Firebase login, so a token is only ever issued for the caller's own project.
 export const previewToken = onRequest({ cors: true }, async (req, res) => {
@@ -10,7 +10,11 @@ export const previewToken = onRequest({ cors: true }, async (req, res) => {
     const uid = await uidFrom(req)
     const projectId = String(req.query.projectId ?? '')
     if (!projectId) throw new Error('Missing projectId')
-    res.json(await mintPreviewToken(uid, projectId))
+    await assertOwns(uid, projectId)
+    const grant = await mintPreviewToken(uid, projectId)
+    // Opportunistic, and never allowed to fail the mint.
+    void sweepExpired().catch(() => {})
+    res.json(grant)
   } catch (e) {
     res.status(isHlError(e) ? e.status : 400).json({ error: (e as Error).message })
   }
@@ -25,11 +29,11 @@ export const hlPreview = onRequest(async (req, res) => {
   if (req.method === 'OPTIONS') return void res.status(204).send('')
 
   const resource = req.path.replace(/^\/+|\/+$/g, '').split('/').pop() ?? ''
-  const handler = resources[resource]
+  const handler = Object.hasOwn(resources, resource) ? resources[resource] : undefined
   if (!handler) return void res.status(404).json({ error: `Unknown resource ${resource}` })
 
   try {
-    const token = String(req.get('X-Preview-Token') ?? req.query.token ?? '')
+    const token = String(req.get('X-Preview-Token') ?? '')
     const grant = await claimPreviewToken(token)
     res.json(await handler(grant.uid))
   } catch (e) {

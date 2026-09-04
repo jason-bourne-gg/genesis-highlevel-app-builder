@@ -37,3 +37,21 @@ export async function claimPreviewToken(token: string): Promise<PreviewGrant> {
   }
   return grant
 }
+
+export async function assertOwns(uid: string, projectId: string): Promise<void> {
+  const snap = await getFirestore().doc(`projects/${projectId}`).get()
+  if (!snap.exists || snap.data()?.ownerUid !== uid) {
+    throw new HlError('forbidden', 'Not your project', 403)
+  }
+}
+
+// Tokens are minted per render and only deleted when claimed after expiry, so the
+// collection would grow without bound. Single-field range query, no index needed.
+export async function sweepExpired(): Promise<void> {
+  const stale = await getFirestore()
+    .collection('previewTokens')
+    .where('expiresAt', '<', Date.now())
+    .limit(50)
+    .get()
+  await Promise.all(stale.docs.map((d) => d.ref.delete()))
+}

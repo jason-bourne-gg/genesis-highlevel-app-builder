@@ -3,19 +3,23 @@ import type { ProjectFile } from './store'
 // Must stay in step with buildPreview() in frontend/src/lib/preview.ts, which
 // stitches the files together by replacing exactly these tags.
 const REQUIRED = [
-  { what: 'a <link> to styles.css', re: /<link[^>]+href=["']styles\.css["'][^>]*>/i },
-  { what: 'a <script src="hl.js"> tag', re: /<script[^>]+src=["']hl\.js["'][^>]*>\s*<\/script>/i },
+  { what: 'a <link> to styles.css', re: /<link[^>]+href=["'](?:\.\/)?styles\.css["'][^>]*>/i },
+  { what: 'a <script src="hl.js"> tag', re: /<script[^>]+src=["'](?:\.\/)?hl\.js["'][^>]*>\s*<\/script>/i },
   {
     what: 'a <script type="module" src="app.js"> tag',
-    re: /<script[^>]+src=["']app\.js["'][^>]*>\s*<\/script>/i,
+    re: /<script[^>]+src=["'](?:\.\/)?app\.js["'][^>]*>\s*<\/script>/i,
   },
 ]
 
 // A shell missing one of these renders blank with no error, which is the worst
 // possible failure: it looks like the generated app is broken.
-export function validateShell(files: Map<string, string>): string | null {
+// `wrote` is what the model produced this turn. A hand-edited index.html is the
+// user's own business, so only a shell the model just wrote is held to the contract
+// — otherwise one manual edit would fail every future generation on the project.
+export function validateShell(files: Map<string, string>, wrote: Set<string>): string | null {
   const html = files.get('index.html')
   if (!html) return 'The model did not produce an index.html, so there is nothing to preview.'
+  if (!wrote.has('index.html')) return null
 
   const missing = REQUIRED.filter(({ re }) => !re.test(html)).map(({ what }) => what)
   if (!missing.length) return null

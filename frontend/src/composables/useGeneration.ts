@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { toast } from 'vue-sonner'
 import type { Message } from '@/types'
 import { streamGeneration } from '@/services/generation'
 import { useModel } from './useModel'
@@ -44,26 +45,32 @@ export function useGeneration(projectId: string) {
     // Parks incoming Firestore updates until the stream ends.
     workspace.streaming.value = true
     status.value = ''
-    await workspace.ready
-
-    // Optimistic copies; the function writes the real message documents.
-    workspace.messages.value = [
-      ...workspace.messages.value,
-      { id: localId(), role: 'user', content: text, createdAt: Date.now(), status: 'complete' },
-    ]
-    const reply: Message = {
-      id: localId(),
-      role: 'assistant',
-      content: '',
-      createdAt: Date.now(),
-      status: 'streaming',
-    }
-    workspace.messages.value = [...workspace.messages.value, reply]
 
     const controller = new AbortController()
     session.controller = controller
 
+    // Out here so the finally always settles it, even if the project never loaded.
+    let reply: Message | null = null
+
     try {
+      await workspace.ready
+
+      // Optimistic copies; the function writes the real message documents.
+      workspace.messages.value = [
+        ...workspace.messages.value,
+        { id: localId(), role: 'user', content: text, createdAt: Date.now(), status: 'complete' },
+        {
+          id: localId(),
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+          status: 'streaming',
+        },
+      ]
+      // Read the handle back out of the array. Mutating the object that was pushed in
+      // bypasses the reactive proxy, so streamed text would never render.
+      reply = workspace.messages.value[workspace.messages.value.length - 1]
+
       for await (const event of streamGeneration(projectId, text, model.value, controller.signal)) {
         switch (event.type) {
           case 'status':
@@ -90,12 +97,16 @@ export function useGeneration(projectId: string) {
       }
     } catch (e) {
       // An abort is the user pressing stop, not a failure.
-      if (!controller.signal.aborted) {
+      if (controller.signal.aborted) {
+        // Settled in the finally.
+      } else if (reply) {
         reply.status = 'failed'
         reply.error = (e as Error).message
+      } else {
+        toast.error((e as Error).message)
       }
     } finally {
-      if (controller.signal.aborted) reply.status = 'stopped'
+      if (reply && controller.signal.aborted) reply.status = 'stopped'
       streamingPath.value = null
       status.value = ''
       generating.value = false
