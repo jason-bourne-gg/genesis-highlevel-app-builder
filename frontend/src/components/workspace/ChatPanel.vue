@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowUpIcon, ChevronDownIcon, SquareIcon } from '@lucide/vue'
+import { ArrowUpIcon, ChevronDownIcon, PlugZapIcon, SquareIcon } from '@lucide/vue'
 import ChatMessage from './ChatMessage.vue'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -15,11 +15,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useGeneration } from '@/composables/useGeneration'
 import { useModel } from '@/composables/useModel'
+import { useHighLevel } from '@/composables/useHighLevel'
 
 const props = defineProps<{ projectId: string }>()
 
 const { messages, generating, status, send, stop } = useGeneration(props.projectId)
 const { model, selected, models } = useModel()
+const { connected, connecting, connect } = useHighLevel()
 
 const draft = ref('')
 const shell = ref<HTMLElement | null>(null)
@@ -99,6 +101,29 @@ function onKeydown(event: KeyboardEvent) {
     </div>
 
     <div class="border-t p-3">
+      <div
+        v-if="!connected"
+        class="border-warning/35 bg-warning/[0.06] mb-2.5 flex items-start gap-2.5 rounded-lg border p-2.5"
+      >
+        <PlugZapIcon class="text-warning mt-0.5 size-3.5 shrink-0" />
+        <div class="min-w-0 flex-1">
+          <p class="text-[13px] leading-snug font-medium">No HighLevel account connected</p>
+          <p class="text-muted-foreground mt-0.5 text-xs leading-snug">
+            Genesis will still write the app, but the preview has no contacts or appointments
+            to show until you connect.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            class="mt-2 h-7 text-xs"
+            :disabled="connecting"
+            @click="connect"
+          >
+            Connect HighLevel
+          </Button>
+        </div>
+      </div>
+
       <div class="relative">
         <Textarea
           v-model="draft"

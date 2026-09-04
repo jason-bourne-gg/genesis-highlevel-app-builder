@@ -8,8 +8,11 @@ import { useHighLevel } from '@/composables/useHighLevel'
 const { connection, connected, connecting, lost, connect, disconnect } = useHighLevel()
 
 async function link() {
-  await connect()
-  toast.success(`Connected to ${connection.value.locationName}`)
+  try {
+    await connect()
+  } catch (e) {
+    toast.error(`Could not start the HighLevel connection: ${(e as Error).message}`)
+  }
 }
 </script>
 

@@ -30,13 +30,20 @@ watch(open, (isOpen) => {
   error.value = ''
 })
 
+const MAX_NAME = 60
+
 function submit() {
-  if (!name.value.trim()) {
+  const trimmed = name.value.trim()
+  if (!trimmed) {
     error.value = 'Give the project a name'
     return
   }
+  if (trimmed.length > MAX_NAME) {
+    error.value = `Keep the name under ${MAX_NAME} characters`
+    return
+  }
   error.value = ''
-  emit('create', name.value.trim(), description.value.trim())
+  emit('create', trimmed, description.value.trim())
 }
 </script>
 
