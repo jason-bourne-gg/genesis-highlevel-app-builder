@@ -25,8 +25,8 @@ from a HighLevel sub-account.*
 
 | | |
 | --- | --- |
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Generating](docs/screenshots/workspace-streaming.png) |
-| Projects and the HighLevel connection | Code streaming into the editor |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Sign in](docs/screenshots/sign-in.png) |
+| Projects and the connected HighLevel location | Sign in |
 
 ---
 
