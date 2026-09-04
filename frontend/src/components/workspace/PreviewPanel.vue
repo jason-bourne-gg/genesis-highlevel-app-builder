@@ -22,10 +22,23 @@ function refresh() {
 
 watch(previewRevision, refresh, { immediate: true })
 
+// A blob: URL would inherit this origin, letting generated code read the Firebase
+// session out of IndexedDB. Open a bare shell instead and sandbox the app inside it,
+// matching the in-page preview.
 function openInTab() {
-  const url = URL.createObjectURL(new Blob([doc.value], { type: 'text/html' }))
-  window.open(url, '_blank', 'noopener')
-  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  const win = window.open('', '_blank')
+  if (!win) return
+
+  win.document.write(
+    '<!doctype html><meta charset="utf-8"><title>Preview</title>' +
+      '<style>html,body{margin:0;height:100%}iframe{display:block;border:0;width:100%;height:100%}</style>' +
+      '<iframe sandbox="allow-scripts"></iframe>',
+  )
+  win.document.close()
+  win.opener = null
+
+  const frame = win.document.querySelector('iframe')
+  if (frame) frame.srcdoc = doc.value
 }
 </script>
 
