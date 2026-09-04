@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { LoaderCircleIcon, SparklesIcon } from '@lucide/vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,28 +48,43 @@ async function submit() {
 
 <template>
   <div class="grid min-h-full lg:grid-cols-2">
-    <div
-      class="relative hidden flex-col justify-between border-r bg-linear-to-br from-violet-950/30 via-zinc-950 to-zinc-950 p-12 lg:flex"
-    >
+    <div class="brand-wash relative hidden flex-col justify-between border-r p-12 lg:flex">
       <div class="flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <SparklesIcon class="size-5 text-violet-400" />
+        <span
+          class="from-primary to-highlight text-primary-foreground grid size-8 place-items-center rounded-lg bg-linear-to-br shadow-sm"
+        >
+          <SparklesIcon class="size-4.5" />
+        </span>
         Genesis
       </div>
       <div class="max-w-md space-y-4">
         <p class="text-3xl leading-tight font-medium tracking-tight text-balance">
-          Describe the app. Watch it get written.
+          Describe the app.
+          <span class="brand-text font-semibold">Watch it get written.</span>
         </p>
         <p class="text-muted-foreground text-sm">
           Genesis builds small internal tools straight onto your HighLevel location — contacts,
           conversations and calendars, no glue code.
         </p>
       </div>
-      <p class="text-muted-foreground text-xs">Acme Dental &middot; sandbox location</p>
+      <p class="text-muted-foreground flex items-center gap-2 text-xs">
+        <span class="bg-highlight size-1.5 rounded-full" />
+        Acme Dental &middot; sandbox location
+      </p>
     </div>
 
-    <div class="flex items-center justify-center p-6">
+    <div class="relative flex items-center justify-center p-6">
+      <div class="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+
       <form class="w-full max-w-sm space-y-6" novalidate @submit.prevent="submit">
         <div class="space-y-1.5">
+          <span
+            class="from-primary to-highlight text-primary-foreground mb-4 grid size-9 place-items-center rounded-xl bg-linear-to-br shadow-sm lg:hidden"
+          >
+            <SparklesIcon class="size-5" />
+          </span>
           <h1 class="text-2xl font-semibold tracking-tight">
             {{ mode === 'signin' ? 'Sign in' : 'Create an account' }}
           </h1>
@@ -116,13 +132,13 @@ async function submit() {
         <p class="text-muted-foreground text-center text-sm">
           <template v-if="mode === 'signin'">
             No account?
-            <RouterLink to="/signup" class="text-foreground underline underline-offset-4">
+            <RouterLink to="/signup" class="text-primary font-medium underline-offset-4 hover:underline">
               Sign up
             </RouterLink>
           </template>
           <template v-else>
             Already have one?
-            <RouterLink to="/signin" class="text-foreground underline underline-offset-4">
+            <RouterLink to="/signin" class="text-primary font-medium underline-offset-4 hover:underline">
               Sign in
             </RouterLink>
           </template>

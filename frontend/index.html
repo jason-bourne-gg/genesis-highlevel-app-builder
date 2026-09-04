@@ -1,10 +1,31 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23a78bfa'%3E%3Cpath d='M12 2l2.2 5.8L20 10l-5.8 2.2L12 18l-2.2-5.8L4 10l5.8-2.2z'/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23673ce8'%3E%3Cpath d='M12 2l2.2 5.8L20 10l-5.8 2.2L12 18l-2.2-5.8L4 10l5.8-2.2z'/%3E%3C/svg%3E" />
     <title>Genesis</title>
+    <script>
+      // Resolve the theme before the first paint, otherwise the app flashes the
+      // wrong one on every load. Must match src/lib/local.ts (prefix + JSON) and
+      // src/composables/useTheme.ts (key + values) exactly — the two readers have
+      // to agree or the first frame disagrees with the app.
+      ;(function () {
+        try {
+          var raw = localStorage.getItem('genesis:theme')
+          var setting = raw === null ? 'system' : JSON.parse(raw)
+          if (setting !== 'light' && setting !== 'dark') setting = 'system'
+          var dark =
+            setting === 'system'
+              ? window.matchMedia('(prefers-color-scheme: dark)').matches
+              : setting === 'dark'
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) {
+          // Private mode or blocked storage. Fall back to the light default.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

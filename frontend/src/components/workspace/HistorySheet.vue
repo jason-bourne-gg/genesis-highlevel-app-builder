@@ -18,10 +18,15 @@ const open = defineModel<boolean>('open', { required: true })
 
 const { snapshots, restore } = useWorkspace(props.projectId)
 
-function revert(id: string) {
-  restore(id)
-  open.value = false
-  toast.success('Restored snapshot')
+async function revert(id: string) {
+  try {
+    await restore(id)
+    open.value = false
+    toast.success('Restored snapshot')
+  } catch (e) {
+    // The sheet stays open so the user can try the same snapshot again.
+    toast.error(`Could not restore: ${(e as Error).message}`)
+  }
 }
 </script>
 
