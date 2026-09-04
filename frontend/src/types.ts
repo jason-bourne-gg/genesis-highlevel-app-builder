@@ -18,6 +18,15 @@ export interface ProjectFile {
   content: string
 }
 
+export interface MessageUsage {
+  model: string
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+  costUsd: number
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -25,6 +34,7 @@ export interface Message {
   createdAt: number
   status: 'complete' | 'streaming' | 'stopped' | 'failed'
   error?: string
+  usage?: MessageUsage
 }
 
 export interface Snapshot {

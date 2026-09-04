@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { TriangleAlertIcon } from '@lucide/vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { formatCost, formatTokens } from '@/lib/cost'
 import type { Message } from '@/types'
 
 const props = defineProps<{ message: Message }>()
@@ -41,6 +42,15 @@ const parts = computed(() =>
       />
     </div>
   </div>
+
+  <p
+    v-if="message.usage && message.usage.outputTokens"
+    class="text-muted-foreground/70 font-mono text-[10.5px]"
+  >
+    {{ formatTokens(message.usage.inputTokens) }} in &middot;
+    {{ formatTokens(message.usage.outputTokens) }} out &middot;
+    {{ formatCost(message.usage.costUsd) }}
+  </p>
 
   <p v-if="message.status === 'stopped'" class="text-muted-foreground text-xs italic">
     Stopped by you. Whatever was written has been kept.

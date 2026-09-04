@@ -1,10 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { logger } from 'firebase-functions/v2'
 import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
 import { ANTHROPIC_API_KEY, config } from '../config'
 import { isHlError } from '../errors'
 import { HL_CLIENT_SOURCE } from './hlClient'
 import { resolveModel, supportsAdaptiveThinking } from './models'
+import { priceUsage, type GenerationUsage } from './usage'
 import { FileStreamParser } from './parser'
 import { SYSTEM_PROMPT } from './prompt'
 import { asFiles, stripFence, validateShell } from './validate'
@@ -92,6 +94,11 @@ export const generate = onRequest(
     const completed = new Map<string, string>()
     let prose = ''
     let failure: string | null = null
+    // Read off the stream rather than the final message, so a run the user stops
+    // still reports what it burned. Anthropic bills for what was generated.
+    let usage: GenerationUsage | null = null
+    let usageIn: Record<string, number> = {}
+    let usageOut: Record<string, number> = {}
 
     try {
       const client = new Anthropic({ apiKey: config.anthropicKey })
@@ -119,6 +126,14 @@ export const generate = onRequest(
       )
 
       for await (const chunk of stream) {
+        if (chunk.type === 'message_start') {
+          usageIn = chunk.message.usage as unknown as Record<string, number>
+          continue
+        }
+        if (chunk.type === 'message_delta') {
+          usageOut = chunk.usage as unknown as Record<string, number>
+          continue
+        }
         if (chunk.type !== 'content_block_delta') continue
 
         if (chunk.delta.type === 'thinking_delta') {
@@ -168,6 +183,17 @@ export const generate = onRequest(
     }
 
     // Runs even when the browser walked away — the work is already paid for.
+    usage = priceUsage(model, usageIn, usageOut)
+    logger.info('generation.usage', {
+      projectId,
+      uid,
+      model,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      costUsd: usage.costUsd,
+      outcome: aborted ? 'stopped' : failure ? 'failed' : 'complete',
+    })
+
     const status: StoredMessage['status'] = aborted ? 'stopped' : failure ? 'failed' : 'complete'
 
     const written: ProjectFile[] = [...completed.entries()]
@@ -186,7 +212,7 @@ export const generate = onRequest(
         await persist({
           projectId,
           prompt,
-          reply: { role: 'assistant', content: prose, createdAt: 0, status: 'failed', error: failure },
+          reply: { role: 'assistant', content: prose, createdAt: 0, status: 'failed', error: failure, usage },
           written: [],
           snapshot: null,
         })
@@ -196,7 +222,7 @@ export const generate = onRequest(
         await persist({
           projectId,
           prompt,
-          reply: { role: 'assistant', content: prose, createdAt: 0, status },
+          reply: { role: 'assistant', content: prose, createdAt: 0, status, usage },
           written: [...written, { path: HL_PATH, content: HL_CLIENT_SOURCE }],
           snapshot: status === 'complete' ? files : null,
         })
@@ -204,7 +230,7 @@ export const generate = onRequest(
         await persist({
           projectId,
           prompt,
-          reply: { role: 'assistant', content: prose, createdAt: 0, status },
+          reply: { role: 'assistant', content: prose, createdAt: 0, status, usage },
           written: [],
           snapshot: null,
         })

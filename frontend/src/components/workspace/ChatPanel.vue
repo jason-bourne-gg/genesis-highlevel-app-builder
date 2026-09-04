@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useGeneration } from '@/composables/useGeneration'
 import { useModel } from '@/composables/useModel'
+import { formatCost } from '@/lib/cost'
 import { useHighLevel } from '@/composables/useHighLevel'
 
 const props = defineProps<{ projectId: string }>()
@@ -30,6 +31,10 @@ const suggestions = [
   'Build a front desk view with our contacts and upcoming appointments.',
   'Add a search box over the contacts and status filters on the appointments.',
 ]
+
+const spent = computed(() =>
+  messages.value.reduce((total, m) => total + (m.usage?.costUsd ?? 0), 0),
+)
 
 const tail = computed(() => {
   const last = messages.value[messages.value.length - 1]
@@ -157,6 +162,9 @@ function onKeydown(event: KeyboardEvent) {
       <div class="mt-2 flex items-center justify-between gap-2">
         <p class="text-muted-foreground text-[11px]">
           Enter to send &middot; Shift + Enter for a new line
+          <span v-if="spent > 0" class="ml-1.5 font-mono opacity-70">
+            &middot; {{ formatCost(spent) }} this project
+          </span>
         </p>
 
         <!-- The server re-checks the model id, so this is a preference, not a privilege. -->

@@ -1,5 +1,6 @@
 import { getFirestore, type Firestore } from 'firebase-admin/firestore'
 import { HlError } from '../errors'
+import type { GenerationUsage } from './usage'
 
 export interface ProjectFile {
   path: string
@@ -12,6 +13,7 @@ export interface StoredMessage {
   createdAt: number
   status: 'complete' | 'stopped' | 'failed'
   error?: string
+  usage?: GenerationUsage
 }
 
 export interface ProjectContext {
