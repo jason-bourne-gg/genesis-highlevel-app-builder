@@ -44,7 +44,7 @@ so any earlier version can be brought back.
 
 | What | URL |
 | --- | --- |
-| Frontend (Firebase Hosting) | **TODO — not deployed yet** |
+| Frontend (Firebase Hosting) | https://genesysbe-cbd7e.web.app |
 | Cloud Functions base | `https://us-central1-genesysbe-cbd7e.cloudfunctions.net` |
 | `generate` (direct Cloud Run URL) | `https://generate-ykls45eqcq-uc.a.run.app` |
 | Loom walkthrough | **TODO** |
@@ -313,10 +313,15 @@ so a change means redeploying functions. Frontend values are compiled into the
 bundle, so a change means rebuilding and redeploying Hosting. Neither file is
 committed; `.env.example` documents both.
 
-**Set `APP_ORIGIN`.** The OAuth callback returns the browser to whatever
-`APP_ORIGIN` says, defaulting to `http://localhost:6001`. In production it must be
-the deployed Hosting origin, or everyone who connects an account lands on their own
-localhost.
+**Return origins need no configuration for the normal case.** The browser tells
+`oauthStart` where it is running, the server checks that against a list and stores
+it with the one-time ticket, and the callback reads it back from there. The list is
+built from the project id the runtime already knows, so
+`https://<project>.web.app` and `https://<project>.firebaseapp.com` work on a fresh
+deploy with nothing set. Add `APP_ORIGINS`, comma separated, for a custom domain or
+a local port. An origin that is not on the list falls back to the first one rather
+than being honoured, because the callback is public and an unchecked redirect
+target is an open redirect. `APP_ORIGIN` still works as the single-value form.
 
 **HighLevel side.** Register the deployed callback URL in the marketplace app,
 matching `HL_REDIRECT_URI` exactly, and keep `HL_VERSION_ID` filled in while the app

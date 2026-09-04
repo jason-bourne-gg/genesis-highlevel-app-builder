@@ -29,7 +29,11 @@ export function watchConnection(uid: string, onChange: (c: Connection) => void):
 }
 
 export async function startOAuth(): Promise<void> {
-  const { url } = await callFunction<{ url: string }>('/oauthStart')
+  // Tells the callback where to send the browser back to, so the same deployed
+  // functions serve localhost, web.app and any custom domain without reconfiguring.
+  // The server checks it against an allowlist and ignores anything it does not know.
+  const returnTo = encodeURIComponent(window.location.origin)
+  const { url } = await callFunction<{ url: string }>(`/oauthStart?returnTo=${returnTo}`)
   window.location.href = url
 }
 
