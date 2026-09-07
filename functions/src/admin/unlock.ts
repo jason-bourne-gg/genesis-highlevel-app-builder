@@ -75,6 +75,17 @@ const GLOBAL = 60
 // hops the infrastructure appends depends on the ingress path — so it is not something to
 // key a rate limit on. The limit uses the authenticated uid instead, which cannot be forged.
 // The last entry is the closest thing to a real address here.
+// Exported so the comparison is testable without standing up an express request. The
+// username is compared case-insensitively; the password never is.
+export function credentialMatches(username: string, password: string): boolean {
+  const { rootUsername, rootPassword } = config
+  if (!rootUsername || !rootPassword) return false
+  return (
+    matches(username.trim().toLowerCase(), rootUsername.toLowerCase()) &&
+    matches(password, rootPassword)
+  )
+}
+
 export function clientIp(xff: string | undefined, fallback: string | undefined): string {
   const hops = (xff ?? '').split(',').map((h) => h.trim()).filter(Boolean)
   return hops.length ? hops[hops.length - 1] : (fallback ?? 'unknown')
@@ -94,7 +105,7 @@ interface Bucket {
 //
 // getAll rather than two awaited gets: a Firestore transaction reads every document it
 // needs in one call, and issuing concurrent tx.get() calls throws.
-async function throttle(uid: string): Promise<boolean> {
+export async function throttle(uid: string): Promise<boolean> {
   const db = getFirestore()
   const perCaller = db.doc(`adminUnlockAttempts/${encodeURIComponent(uid)}`)
   // Not "__all__": Firestore reserves document ids matching __.*__ and rejects them at
@@ -173,10 +184,7 @@ export const adminUnlock = onRequest({ cors: true }, async (req, res) => {
   const username = String(body.username ?? '').trim()
   const password = String(body.password ?? '')
 
-  if (
-    !matches(username.toLowerCase(), rootUsername.toLowerCase()) ||
-    !matches(password, rootPassword)
-  ) {
+  if (!credentialMatches(username, password)) {
     logger.warn('admin.unlock.rejected', { ip, uid, username })
     // Same message either way: which half was wrong is not the caller's business.
     return void res.status(401).json({

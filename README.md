@@ -140,9 +140,10 @@ VITE_FUNCTIONS_BASE=http://localhost:5001/genesysbe-cbd7e/us-central1
 VITE_GENERATE_URL=http://localhost:5001/genesysbe-cbd7e/us-central1/generate
 ```
 
-`npm test` at the repo root runs everything: 362 cases across eleven files in
+`npm test` at the repo root runs everything: 483 cases across eighteen files in
 `functions/test` (plain node, no framework), then 56 in `frontend/test` (vitest).
 `npm run test:functions` and `npm run test:frontend` run one half.
+`npm run coverage --prefix functions` reports 91% of statements and branches.
 
 Two are worth knowing about:
 
@@ -156,9 +157,12 @@ Two are worth knowing about:
   error anywhere. The test runs thirteen plausible shells through both halves and fails
   if their verdicts disagree.
 
-Still untested: everything that needs Firestore or a network call — the OAuth exchange,
-the single-use token refresh, the preview pass and its write budget, and cancellation.
-Those need the emulator, which needs a JVM.
+Firestore and `fetch` are stubbed in `functions/test/stub.cjs`, which is what makes the
+stateful paths reachable without an emulator: the single-use token refresh, the preview
+pass and its write budget, project ownership, and the flag documents.
+
+Still untested: the HTTP handlers themselves, and `generate`'s orchestration of the
+model stream. Both want an integration test rather than a unit one.
 
 **The emulator cannot connect a HighLevel account.** HighLevel has to redirect your
 browser to our callback URL, and it cannot reach `localhost`. That flow is tested
@@ -345,9 +349,11 @@ accounts. Either is enough, so "off for all but these three" needs no second fla
   commit, which is correct but blunt. Showing what changed between two versions is
   what people actually want from history.
 
-- **Tests past the parser.** The OAuth exchange, the single-use token refresh and
-  the preview pass are the parts most likely to break quietly, and none has
-  automated coverage.
+- **The last of the coverage is the handlers.** 91% of statements and branches, and
+  what remains is HTTP wiring: driving `onRequest` means building a request Express and
+  the CORS middleware accept, at which point the test asserts the mock rather than the
+  code. An integration test against the emulator is the honest way to close it, and the
+  emulator needs a JVM.
 
 ## Deployment notes
 
