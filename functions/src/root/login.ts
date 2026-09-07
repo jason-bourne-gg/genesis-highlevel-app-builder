@@ -1,5 +1,9 @@
 import { getAuth } from 'firebase-admin/auth'
-import { getFirestore } from 'firebase-admin/firestore'
+import {
+  getFirestore,
+  type DocumentReference,
+  type DocumentSnapshot,
+} from 'firebase-admin/firestore'
 import { timingSafeEqual } from 'node:crypto'
 import { logger } from 'firebase-functions/v2'
 import { onRequest } from 'firebase-functions/v2/https'
@@ -22,26 +26,65 @@ function matches(given: string, expected: string): boolean {
 }
 
 const WINDOW_MS = 15 * 60 * 1000
-const MAX_ATTEMPTS = 10
+const PER_IP = 10
+// Higher, because this bucket is shared by everyone. It is the backstop for a caller who
+// forges X-Forwarded-For to get a fresh per-IP bucket on every request; the cost is that a
+// determined attacker can lock root out for a window, which is the better failure of the two.
+const GLOBAL = 60
 
-// The only password endpoint in the project, so it gets the only rate limit. Keyed on
-// the caller's IP in Firestore rather than in memory, because Cloud Run runs several
-// instances and an in-memory counter would give an attacker one bucket per container.
+// X-Forwarded-For is a list, and the entries a client sends arrive intact with the real
+// address appended by Google's frontend. So the trustworthy entry is the LAST one — reading
+// the first lets a caller mint a new rate-limit bucket per request just by sending a header.
+export function clientIp(xff: string | undefined, fallback: string | undefined): string {
+  const hops = (xff ?? '').split(',').map((h) => h.trim()).filter(Boolean)
+  return hops.length ? hops[hops.length - 1] : (fallback ?? 'unknown')
+}
+
+// The only password endpoint in the project, so it gets the only rate limit. Counted in
+// Firestore rather than in memory, because Cloud Run runs several instances and an
+// in-memory counter would hand an attacker one bucket per container.
+interface Bucket {
+  count: number
+  startedAt: number
+}
+
+// The only password endpoint in the project, so it gets the only rate limit. Counted in
+// Firestore rather than in memory, because Cloud Run runs several instances and an
+// in-memory counter would hand an attacker one bucket per container.
+//
+// getAll rather than two awaited gets: a Firestore transaction reads every document it
+// needs in one call, and issuing concurrent tx.get() calls throws.
 async function throttle(ip: string): Promise<boolean> {
-  const doc = getFirestore().doc(`rootLoginAttempts/${encodeURIComponent(ip)}`)
-  return getFirestore().runTransaction(async (tx) => {
-    const snap = await tx.get(doc)
-    const now = Date.now()
-    const data = snap.exists ? (snap.data() as { count: number; startedAt: number }) : null
+  const db = getFirestore()
+  const perIp = db.doc(`rootLoginAttempts/${encodeURIComponent(ip)}`)
+  // Not "__all__": Firestore reserves document ids matching __.*__ and rejects them at
+  // write time, which the client-side path validation does not catch.
+  const global = db.doc('rootLoginAttempts/_global')
 
-    if (!data || now - data.startedAt > WINDOW_MS) {
-      tx.set(doc, { count: 1, startedAt: now })
+  return db.runTransaction(async (tx) => {
+    const now = Date.now()
+    const [ipSnap, allSnap] = await tx.getAll(perIp, global)
+
+    const spend = (
+      snap: DocumentSnapshot,
+      ref: DocumentReference,
+      limit: number,
+    ): boolean => {
+      const data = snap.exists ? (snap.data() as Bucket) : null
+      if (!data || now - data.startedAt > WINDOW_MS) {
+        tx.set(ref, { count: 1, startedAt: now })
+        return true
+      }
+      if (data.count >= limit) return false
+      tx.update(ref, { count: data.count + 1 })
       return true
     }
-    if (data.count >= MAX_ATTEMPTS) return false
 
-    tx.update(doc, { count: data.count + 1 })
-    return true
+    // Both are spent before either result is returned, so a rejected attempt still counts
+    // against each bucket rather than being free once one limit is already hit.
+    const ipOk = spend(ipSnap, perIp, PER_IP)
+    const allOk = spend(allSnap, global, GLOBAL)
+    return ipOk && allOk
   })
 }
 
@@ -95,11 +138,21 @@ export const rootLogin = onRequest({ cors: true }, async (req, res) => {
     })
   }
 
-  const ip = String(req.get('x-forwarded-for') ?? req.ip ?? 'unknown').split(',')[0].trim()
-  if (!(await throttle(ip))) {
-    return void res.status(429).json({
-      error: 'Too many attempts. Wait fifteen minutes.',
-      code: 'throttled',
+  const ip = clientIp(req.get('x-forwarded-for'), req.ip)
+  try {
+    if (!(await throttle(ip))) {
+      return void res.status(429).json({
+        error: 'Too many attempts. Wait fifteen minutes.',
+        code: 'throttled',
+      })
+    }
+  } catch (e) {
+    // Fail closed. A password gate that opens when its rate limit is unavailable is not
+    // a rate limit, and root sign-in being briefly unavailable is the cheaper failure.
+    logger.error('root.login.throttle_failed', { ip, message: (e as Error).message })
+    return void res.status(503).json({
+      error: 'Could not check the rate limit. Try again shortly.',
+      code: 'throttle_unavailable',
     })
   }
 
