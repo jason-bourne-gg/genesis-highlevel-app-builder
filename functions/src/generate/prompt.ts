@@ -237,9 +237,10 @@ export function systemPrompt(o: PromptOptions): string {
       ? NO_WRITES
       : ''
 
-  // The baseline block already ends with a blank line; the composed one does not.
-  const gap = o.writes || o.extendedReads ? '\n' : ''
-  return HEAD + apiSection(o) + gap + REJECTIONS + writeSection + TAIL
+  // Each block carries its own leading and trailing blank line so it reads correctly on
+  // its own, which means a seam between two of them can end up with three newlines.
+  // Collapsing here keeps every combination evenly spaced without hand-tuning each join.
+  return [HEAD, apiSection(o), REJECTIONS, writeSection, TAIL].join('').replace(/\n{3,}/g, '\n\n')
 }
 
 // The all-flags-off surface, which is the original prompt unchanged.

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/composables/useAuth'
 import { useFlags } from '@/composables/useFlags'
-import { safeRedirect } from '@/router'
+import { safeRedirect } from '@/lib/redirect'
 
 const props = defineProps<{ mode: 'signin' | 'signup' }>()
 
