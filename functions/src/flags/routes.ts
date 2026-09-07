@@ -1,21 +1,16 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { logger } from 'firebase-functions/v2'
-import { callerFrom, optionalUid } from '../auth'
+import { claimAdminToken } from '../admin/unlock'
+import { callerFrom } from '../auth'
 import { isHlError } from '../errors'
-import { isRoot, readFlags, resolveFlags, seedFlags, setFlag, type FlagPatch } from './store'
-
-// Public on purpose: the sign-in page has to know whether to show the Google button
-// before anyone is signed in. A bearer token, when present, narrows the answer to that
-// user so actor-targeted flags resolve correctly. Flag names are not secrets.
-export const flags = onRequest({ cors: true }, async (req, res) => {
-  try {
-    const uid = await optionalUid(req)
-    res.set('Cache-Control', 'no-store')
-    res.json({ flags: await resolveFlags(uid) })
-  } catch (e) {
-    res.status(500).json({ error: (e as Error).message })
-  }
-})
+import {
+  isRoot,
+  labelActors,
+  readFlags,
+  seedFlags,
+  setFlag,
+  type FlagPatch,
+} from './store'
 
 // GET lists every registered flag with its raw gates. POST changes one.
 // Root only, checked here rather than in rules, so the flag collection stays
@@ -23,7 +18,12 @@ export const flags = onRequest({ cors: true }, async (req, res) => {
 export const flagsAdmin = onRequest({ cors: true }, async (req, res) => {
   try {
     const caller = await callerFrom(req)
-    const root = isRoot(caller.uid, caller.email, caller.emailVerified, caller.root)
+
+    // Two ways in: configured as root, or holding an unlock pass minted for this account
+    // by adminUnlock. The pass is scoped to one uid, so it cannot be handed to someone else.
+    const pass = await claimAdminToken(String(req.get('X-Admin-Token') ?? ''))
+    const root =
+      isRoot(caller.uid, caller.email, caller.emailVerified) || pass?.uid === caller.uid
 
     if (!root) {
       // 200 with root:false rather than 403, so the UI can render an honest
@@ -33,7 +33,9 @@ export const flagsAdmin = onRequest({ cors: true }, async (req, res) => {
 
     if (req.method === 'GET') {
       await seedFlags()
-      return void res.json({ root: true, flags: await readFlags() })
+      const flags = await readFlags()
+      const labels = await labelActors([...new Set(flags.flatMap((f) => f.actors))])
+      return void res.json({ root: true, flags, labels })
     }
 
     if (req.method === 'POST') {
@@ -50,15 +52,21 @@ export const flagsAdmin = onRequest({ cors: true }, async (req, res) => {
         actors: updated.actors.length,
         by: label,
       })
-      return void res.json({ root: true, flag: updated })
+      return void res.json({
+        root: true,
+        flag: updated,
+        labels: await labelActors(updated.actors),
+      })
     }
 
     res.status(405).json({ error: 'Use GET or POST' })
   } catch (e) {
-    const status = isHlError(e) ? e.status : 400
+    // 500 by default, as every other route here does: a Firestore outage is not a
+    // client error, and reporting it as one sends the admin UI chasing its own input.
+    const status = isHlError(e) ? e.status : 500
     res.status(status).json({
       error: (e as Error).message,
-      code: isHlError(e) ? e.code : 'bad_request',
+      code: isHlError(e) ? e.code : 'internal',
     })
   }
 })

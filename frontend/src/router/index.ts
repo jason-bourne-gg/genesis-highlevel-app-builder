@@ -12,23 +12,18 @@ const router = createRouter({
     { path: '/signup', name: 'signup', component: Auth, props: { mode: 'signup' }, meta: { guest: true } },
     { path: '/', name: 'dashboard', component: Dashboard },
     { path: '/project/:id', name: 'project', component: Workspace, props: true },
-    // The view itself re-checks with the server and renders its own "not your page"
-    // state, so this guard is a redirect for convenience rather than the control.
-    { path: '/admin/flags', name: 'flags', component: AdminFlags, meta: { root: true } },
+    // Any signed-in account can open this. The flags themselves stay hidden until the
+    // root credential is entered on the page, and the server is what decides that.
+    { path: '/admin/flags', name: 'flags', component: AdminFlags },
     { path: '/:rest(.*)', redirect: '/' },
   ],
 })
 
 router.beforeEach(async (to) => {
   await authReady
-  const { signedIn, isRoot } = useAuth()
-  if (to.meta.guest) {
-    if (!signedIn.value) return true
-    return isRoot.value ? { name: 'flags' } : { name: 'dashboard' }
-  }
-  if (!signedIn.value) return { name: 'signin' }
-  if (to.meta.root && !isRoot.value) return { name: 'dashboard' }
-  return true
+  const { signedIn } = useAuth()
+  if (to.meta.guest) return signedIn.value ? { name: 'dashboard' } : true
+  return signedIn.value ? true : { name: 'signin' }
 })
 
 export default router

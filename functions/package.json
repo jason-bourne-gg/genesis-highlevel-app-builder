@@ -10,7 +10,7 @@
     "watch": "tsc -w",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "deploy": "firebase deploy --only functions",
-    "test": "node test/parser.test.cjs && node test/rootip.test.cjs"
+    "test": "node test/parser.test.cjs && node test/adminip.test.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

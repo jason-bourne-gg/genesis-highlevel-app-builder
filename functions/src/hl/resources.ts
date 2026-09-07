@@ -183,19 +183,36 @@ export async function messages(
 
 // Availability, so a booking UI can offer times that are actually free rather than
 // letting someone pick a slot HighLevel will reject.
+const DEFAULT_SLOT_MINUTES = 30
+
 export async function slots(uid: string, query: Query = {}): Promise<{ slots: Slot[] }> {
   const calendarId = (query.calendarId ?? '').trim()
   if (!calendarId) throw new HlError('invalid_request', 'calendarId is required', 400)
 
   const days = Math.min(Math.max(Number(query.days ?? 14) || 14, 1), EVENT_WINDOW_DAYS)
-  const res = await hlGet<Record<string, unknown>>(
-    uid,
-    `/calendars/${encodeURIComponent(calendarId)}/free-slots`,
-    {
-      startDate: String(Date.now()),
-      endDate: String(Date.now() + days * 86400_000),
-    },
-  )
+
+  // HighLevel returns start times only, and the length comes from the calendar's own
+  // configuration. Assuming 30 minutes books the wrong duration on any calendar set to
+  // something else — real overlapping or gapped appointments, with no error anywhere.
+  const [detail, res] = await Promise.all([
+    hlGet<{ calendar?: { slotDuration?: number; slotDurationUnit?: string } }>(
+      uid,
+      `/calendars/${encodeURIComponent(calendarId)}`,
+    ).catch(() => null),
+    hlGet<Record<string, unknown>>(
+      uid,
+      `/calendars/${encodeURIComponent(calendarId)}/free-slots`,
+      {
+        startDate: String(Date.now()),
+        endDate: String(Date.now() + days * 86400_000),
+      },
+    ),
+  ])
+
+  const raw = Number(detail?.calendar?.slotDuration ?? 0)
+  const unit = String(detail?.calendar?.slotDurationUnit ?? 'mins').toLowerCase()
+  const minutes =
+    raw > 0 ? (unit.startsWith('hour') ? raw * 60 : raw) : DEFAULT_SLOT_MINUTES
 
   // The response is keyed by date, each day holding a slots array of ISO strings.
   const out: Slot[] = []
@@ -207,7 +224,7 @@ export async function slots(uid: string, query: Query = {}): Promise<{ slots: Sl
       if (!startTime || Number.isNaN(Date.parse(startTime))) continue
       out.push({
         startTime,
-        endTime: new Date(Date.parse(startTime) + 30 * 60_000).toISOString(),
+        endTime: new Date(Date.parse(startTime) + minutes * 60_000).toISOString(),
       })
     }
   }
@@ -225,5 +242,3 @@ export const resources: Record<string, (uid: string, query?: Query) => Promise<u
   slots,
 }
 
-// Reads that mutate nothing but need a parameter, so they are still GETs.
-export const PARAMETERISED = new Set(['search', 'messages', 'slots'])

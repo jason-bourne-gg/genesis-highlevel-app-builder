@@ -21,6 +21,9 @@ const writes = ref(false)
 // A fresh token per render: short lived and scoped to this project.
 async function refresh() {
   tokenError.value = ''
+  // Reset with the token. Left set, a previous successful mint would keep hl.writes true
+  // after a disconnect or a failed mint, so the app would render write buttons that fail.
+  writes.value = false
   let token = ''
 
   if (connected.value) {
