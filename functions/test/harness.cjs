@@ -28,6 +28,27 @@ function throws(fn, matching) {
   })
 }
 
+// Async cases are queued and awaited in order, so a stubbed module is never swapped out
+// from under another case still running against it.
+const queue = []
+
+function atest(name, fn) {
+  queue.push([name, fn])
+}
+
+async function run(label) {
+  for (const [name, fn] of queue) {
+    count++
+    try {
+      await fn()
+    } catch (e) {
+      failures++
+      console.error(`  ✗ ${name}\n    ${(e.message || String(e)).split('\n').join('\n    ')}`)
+    }
+  }
+  done(label)
+}
+
 function done(label) {
   if (failures) {
     console.error(`not ok — ${label}: ${failures} of ${count} cases failed`)
@@ -36,4 +57,4 @@ function done(label) {
   console.log(`ok — ${label}, ${count} cases`)
 }
 
-module.exports = { test, throws, done, assert }
+module.exports = { test, atest, run, throws, done, assert }

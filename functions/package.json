@@ -10,7 +10,8 @@
     "watch": "tsc -w",
     "serve": "npm run build && firebase emulators:start --only functions,firestore,auth",
     "deploy": "firebase deploy --only functions",
-    "test": "node test/adminip.test.cjs && node test/fields.test.cjs && node test/fileid.test.cjs && node test/flags.test.cjs && node test/models.test.cjs && node test/origins.test.cjs && node test/parser.test.cjs && node test/prompt.test.cjs && node test/query.test.cjs && node test/usage.test.cjs && node test/validate.test.cjs"
+    "test": "node test/adminip.test.cjs && node test/fields.test.cjs && node test/fileid.test.cjs && node test/flags.test.cjs && node test/flagstore.test.cjs && node test/genstore.test.cjs && node test/models.test.cjs && node test/origins.test.cjs && node test/parser.test.cjs && node test/previewtokens.test.cjs && node test/prompt.test.cjs && node test/query.test.cjs && node test/resources.test.cjs && node test/throttle.test.cjs && node test/tokens.test.cjs && node test/usage.test.cjs && node test/validate.test.cjs && node test/writers.test.cjs",
+    "coverage": "c8 --reporter=text --include='lib/**/*.js' npm test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
