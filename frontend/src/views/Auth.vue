@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ChevronRightIcon, LoaderCircleIcon, SparklesIcon } from '@lucide/vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/composables/useAuth'
 import { useFlags } from '@/composables/useFlags'
+import { safeRedirect } from '@/router'
 
 const props = defineProps<{ mode: 'signin' | 'signup' }>()
 
@@ -22,6 +23,10 @@ const GoogleMark = () =>
   ])
 
 const router = useRouter()
+const route = useRoute()
+
+// Where the guard wanted to send us before it bounced here.
+const afterSignIn = () => safeRedirect(route.query.redirect) ?? { name: 'dashboard' }
 const { pending, signIn, signUp, signInWithGoogle } = useAuth()
 const { googleLogin } = useFlags()
 
@@ -68,7 +73,7 @@ async function submit() {
   const run = props.mode === 'signin' ? signIn : signUp
   try {
     await run(address, password.value)
-    router.push({ name: 'dashboard' })
+    router.push(afterSignIn())
   } catch (e) {
     errors.value = { form: (e as Error).message }
   }
@@ -78,7 +83,7 @@ async function google() {
   errors.value = {}
   try {
     await signInWithGoogle()
-    router.push({ name: 'dashboard' })
+    router.push(afterSignIn())
   } catch (e) {
     errors.value = { form: (e as Error).message }
   }

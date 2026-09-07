@@ -5,6 +5,14 @@ import Auth from '@/views/Auth.vue'
 import Dashboard from '@/views/Dashboard.vue'
 import Workspace from '@/views/Workspace.vue'
 
+// Only same-origin paths. A protocol-relative value like //evil.com is a valid path to
+// the browser and would make this an open redirect.
+export function safeRedirect(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  if (!value.startsWith('/') || value.startsWith('//')) return null
+  return value
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -22,8 +30,18 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   await authReady
   const { signedIn } = useAuth()
-  if (to.meta.guest) return signedIn.value ? { name: 'dashboard' } : true
-  return signedIn.value ? true : { name: 'signin' }
+
+  if (to.meta.guest) {
+    if (!signedIn.value) return true
+    // Honour a pending destination, so signing in from a deep link lands there rather
+    // than on the dashboard.
+    return safeRedirect(to.query.redirect) ?? { name: 'dashboard' }
+  }
+
+  // Carried so sign-in can return the person to the page they asked for. Without it,
+  // opening a deep link while signed out silently becomes "sign in, land on the
+  // dashboard", which is indistinguishable from the link being broken.
+  return signedIn.value ? true : { name: 'signin', query: { redirect: to.fullPath } }
 })
 
 export default router
