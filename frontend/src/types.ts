@@ -1,6 +1,9 @@
 export interface User {
   id: string
   email: string
+  // From a signed custom claim on the ID token, set by the rootLogin function. Gates the
+  // feature-flag admin in the UI; the server checks the same claim again on every call.
+  root: boolean
 }
 
 export interface Project {
@@ -90,3 +93,21 @@ export type StreamEvent =
   | { type: 'token'; path: string; text: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
+
+export interface FlagActor {
+  uid: string
+  email: string
+}
+
+export interface FlagState {
+  key: string
+  label: string
+  description: string
+  // True for a flag resolved before sign-in, which therefore has no actor to target.
+  globalOnly?: boolean
+  default: boolean
+  enabled: boolean
+  actors: FlagActor[]
+  updatedAt: number
+  updatedBy: string
+}

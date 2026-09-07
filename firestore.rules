@@ -31,6 +31,21 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Read by every client, including signed-out ones on the sign-in page, because the
+    // Google button is itself behind a flag. Flag names and the uids on an actor list are
+    // identifiers, not secrets. Writes go only through flagsAdmin, which checks root.
+    match /flags/{key} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Rate-limit counters for the root credential endpoint. Written by the function with
+    // the admin SDK; a client that could read these would learn which addresses are being
+    // tried, and one that could write them could clear its own limit.
+    match /rootLoginAttempts/{ip} {
+      allow read, write: if false;
+    }
+
     match /projects/{projectId} {
       allow read: if owner(resource.data.ownerUid);
       allow create: if owner(request.resource.data.ownerUid);

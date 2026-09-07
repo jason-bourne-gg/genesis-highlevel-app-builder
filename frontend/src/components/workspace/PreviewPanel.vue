@@ -16,6 +16,7 @@ const { connected, lost, connecting, connect } = useHighLevel()
 const doc = ref('')
 const frame = ref(0)
 const tokenError = ref('')
+const writes = ref(false)
 
 // A fresh token per render: short lived and scoped to this project.
 async function refresh() {
@@ -24,14 +25,16 @@ async function refresh() {
 
   if (connected.value) {
     try {
-      token = (await mintPreviewToken(props.projectId)).token
+      const grant = await mintPreviewToken(props.projectId)
+      token = grant.token
+      writes.value = grant.writes === true
     } catch (e) {
       // The app still renders; it just shows its own empty state when hl.js fails.
       tokenError.value = (e as Error).message
     }
   }
 
-  doc.value = buildPreview(files.value, token)
+  doc.value = buildPreview(files.value, token, writes.value)
   frame.value++
 }
 

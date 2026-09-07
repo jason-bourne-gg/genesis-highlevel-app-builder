@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { h, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ChevronRightIcon, LoaderCircleIcon, SparklesIcon } from '@lucide/vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -7,11 +7,28 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/composables/useAuth'
+import { useFlags } from '@/composables/useFlags'
+import { looksLikeUsername } from '@/services/auth'
 
 const props = defineProps<{ mode: 'signin' | 'signup' }>()
 
+// Inlined rather than pulled from an icon set: Google's mark is four fixed colours and
+// must not be recoloured to match the theme.
+const GoogleMark = () =>
+  h(
+    'svg',
+    { viewBox: '0 0 18 18', class: 'size-4', 'aria-hidden': 'true' },
+    [
+      h('path', { fill: '#4285F4', d: 'M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62Z' }),
+      h('path', { fill: '#34A853', d: 'M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.34A9 9 0 0 0 9 18Z' }),
+      h('path', { fill: '#FBBC05', d: 'M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.94H.96a9 9 0 0 0 0 8.12l3.01-2.34Z' }),
+      h('path', { fill: '#EA4335', d: 'M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.94l3.01 2.34C4.68 5.16 6.66 3.58 9 3.58Z' }),
+    ],
+  )
+
 const router = useRouter()
-const { pending, signIn, signUp } = useAuth()
+const { pending, signIn, signUp, signInWithGoogle } = useAuth()
+const { googleLogin } = useFlags()
 
 const email = ref('')
 const password = ref('')
@@ -37,11 +54,17 @@ async function submit() {
   const found: Record<string, string> = {}
   const address = email.value.trim()
 
-  if (!address) found.email = 'Enter your email'
-  else if (!LOOKS_LIKE_EMAIL.test(address)) found.email = "That email address doesn't look right"
+  // An identifier with no @ is a root username, handled by a different endpoint, so the
+  // email shape and the signup password rules do not apply to it.
+  const asUsername = props.mode === 'signin' && looksLikeUsername(address)
+
+  if (!address) found.email = asUsername ? 'Enter your username' : 'Enter your email'
+  else if (!asUsername && !LOOKS_LIKE_EMAIL.test(address)) {
+    found.email = "That email address doesn't look right"
+  }
 
   if (!password.value) found.password = 'Enter a password'
-  else if (props.mode === 'signup' && password.value.length < MIN_PASSWORD) {
+  else if (!asUsername && props.mode === 'signup' && password.value.length < MIN_PASSWORD) {
     found.password = `Use at least ${MIN_PASSWORD} characters`
   }
 
@@ -56,6 +79,17 @@ async function submit() {
   const run = props.mode === 'signin' ? signIn : signUp
   try {
     await run(address, password.value)
+    // A root session exists to administer flags, so send it straight there.
+    router.push(asUsername ? { name: 'flags' } : { name: 'dashboard' })
+  } catch (e) {
+    errors.value = { form: (e as Error).message }
+  }
+}
+
+async function google() {
+  errors.value = {}
+  try {
+    await signInWithGoogle()
     router.push({ name: 'dashboard' })
   } catch (e) {
     errors.value = { form: (e as Error).message }
@@ -116,10 +150,28 @@ async function submit() {
           </p>
         </div>
 
+        <template v-if="googleLogin">
+          <Button type="button" variant="outline" class="w-full" :disabled="pending" @click="google">
+            <GoogleMark />
+            Continue with Google
+          </Button>
+          <div class="flex items-center gap-3">
+            <span class="bg-border h-px flex-1" />
+            <span class="text-muted-foreground text-xs">or</span>
+            <span class="bg-border h-px flex-1" />
+          </div>
+        </template>
+
         <div class="space-y-4">
           <div class="space-y-2">
-            <Label for="email">Email</Label>
-            <Input id="email" v-model="email" type="email" placeholder="you@clinic.com" autocomplete="email" />
+            <Label for="email">{{ mode === 'signin' ? 'Email or username' : 'Email' }}</Label>
+            <Input
+              id="email"
+              v-model="email"
+              :type="mode === 'signin' ? 'text' : 'email'"
+              placeholder="you@clinic.com"
+              :autocomplete="mode === 'signin' ? 'username' : 'email'"
+            />
             <p v-if="errors.email" class="text-destructive text-xs">{{ errors.email }}</p>
           </div>
 
