@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { LogOutIcon, MonitorIcon, MoonIcon, SunIcon } from '@lucide/vue'
+import { LogOutIcon, MonitorIcon, MoonIcon, ShieldIcon, SunIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -17,7 +17,7 @@ import { useAuth } from '@/composables/useAuth'
 import { type ThemeSetting, useTheme } from '@/composables/useTheme'
 
 const router = useRouter()
-const { user, signOut } = useAuth()
+const { user, isRoot, signOut } = useAuth()
 const { theme, resolved, settings } = useTheme()
 
 // The radio group hands back a plain string; narrow it back to the union.
@@ -46,7 +46,10 @@ async function leave() {
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" class="w-56">
-      <DropdownMenuLabel class="truncate font-normal">{{ user?.email }}</DropdownMenuLabel>
+      <DropdownMenuLabel class="truncate font-normal">
+        {{ user?.email }}
+        <span v-if="isRoot" class="text-muted-foreground ml-1 text-xs">· root</span>
+      </DropdownMenuLabel>
       <DropdownMenuSeparator />
 
       <DropdownMenuLabel class="text-muted-foreground text-xs font-normal">
@@ -71,6 +74,10 @@ async function leave() {
       </DropdownMenuRadioGroup>
 
       <DropdownMenuSeparator />
+      <DropdownMenuItem v-if="isRoot" @select="router.push({ name: 'flags' })">
+        <ShieldIcon />
+        Feature flags
+      </DropdownMenuItem>
       <DropdownMenuItem @select="leave">
         <LogOutIcon />
         Sign out
