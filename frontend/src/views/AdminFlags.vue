@@ -12,7 +12,6 @@ import { toast } from 'vue-sonner'
 import FlagSwitch from '@/components/FlagSwitch.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import UserMenu from '@/components/UserMenu.vue'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -232,9 +231,6 @@ const stateOf = (flag: FlagState) =>
                   Accounts
                   <span class="text-muted-foreground font-normal">({{ users.length }})</span>
                 </h2>
-                <Badge v-if="selected.enabled" variant="secondary">
-                  On for everyone — these toggles are the list, not the outcome
-                </Badge>
                 <div class="flex-1" />
                 <Input
                   v-model="filter"
@@ -244,6 +240,12 @@ const stateOf = (flag: FlagState) =>
                   aria-label="Filter accounts"
                 />
               </div>
+
+              <p v-if="selected.enabled" class="text-muted-foreground mt-2 text-sm">
+                This flag is on for everyone, so every account below has it. Turn
+                <span class="text-foreground">On for everyone</span> off to target accounts
+                individually — the list is kept.
+              </p>
 
               <div class="mt-3 overflow-hidden rounded-xl border">
                 <div
@@ -256,6 +258,8 @@ const stateOf = (flag: FlagState) =>
                     <p class="truncate text-sm">{{ user.email }}</p>
                     <p class="text-muted-foreground truncate text-xs">
                       {{ user.provider === 'google.com' ? 'Google' : 'Password' }}
+                      <template v-if="selected.enabled"> · via On for everyone</template>
+                      <template v-else-if="selected.actors.includes(user.uid)"> · on its list</template>
                     </p>
                   </div>
                   <span
@@ -265,7 +269,8 @@ const stateOf = (flag: FlagState) =>
                     {{ onFor(selected, user.uid) ? 'On' : 'Off' }}
                   </span>
                   <FlagSwitch
-                    :model-value="selected.actors.includes(user.uid)"
+                    :model-value="onFor(selected, user.uid)"
+                    :disabled="selected.enabled"
                     :busy="busy === user.uid"
                     :label="`${selected.label} for ${user.email}`"
                     @update:model-value="(v) => setActor(user.uid, v)"
