@@ -10,9 +10,8 @@ vi.mock('firebase/firestore', () => ({
 const { fileId, sortFiles } = await import('@/services/projects')
 
 describe('fileId', () => {
-  // Must match fileId() in functions/src/generate/store.ts: the generation function and
-  // the browser both derive the document id from the path, and a file has to land in the
-  // same place whichever wrote it.
+  // Must match fileId() in functions/src/generate/store.ts: the generation function and the
+  // browser both derive the document id from the path, and a file has to land in the same
   it('leaves the four real paths untouched', () => {
     for (const p of ['index.html', 'app.js', 'styles.css', 'hl.js']) {
       expect(fileId(p)).toBe(p)

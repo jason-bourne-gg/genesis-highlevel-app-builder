@@ -1,6 +1,5 @@
-// Firebase-admin and fetch, replaced in the require cache so the module under test picks
-// up a stub instead. Enough of Firestore to exercise the logic that matters — the
-// single-use token refresh, the flag documents — without an emulator, which needs a JVM.
+// firebase-admin and fetch, swapped through the require cache. Enough of Firestore to
+// reach the stateful paths without the emulator, which needs a JVM.
 const path = require('node:path')
 
 const ROOT = path.resolve(__dirname, '..')

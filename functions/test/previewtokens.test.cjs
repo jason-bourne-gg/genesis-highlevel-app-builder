@@ -10,9 +10,8 @@ const withTokens = (firestore, body) =>
 
 const owned = { [`projects/${PROJECT}`]: { ownerUid: UID } }
 
-// A sandboxed frame has no identity of its own — no cookies, no session — so it cannot
-// prove who it is. It gets an opaque random string instead, looked up server-side on
-// every call, which is revocable in a way a signed token is not.
+// A sandboxed frame has no identity of its own — no cookies, no session — so it cannot prove
+// who it is.
 atest('a minted pass is long, random and stored against the project', async () => {
   await withTokens({}, async ({ pt }, s) => {
     const a = await pt.mintPreviewToken(UID, PROJECT)

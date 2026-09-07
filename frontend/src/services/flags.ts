@@ -9,9 +9,7 @@ export interface FlagGates {
   actors: string[]
 }
 
-// Read straight from Firestore rather than through a function, so a flag flipped in the
-// admin takes effect in every open tab without a reload, and so the sign-in page can
-// resolve one before anyone is signed in. Rules allow reads and deny writes.
+// Straight from Firestore, so a flip lands in every open tab and works before sign-in.
 export function watchFlagGates(onChange: (gates: Record<string, FlagGates>) => void): () => void {
   return onSnapshot(
     collection(db, 'flags'),
@@ -31,9 +29,7 @@ export function watchFlagGates(onChange: (gates: Record<string, FlagGates>) => v
   )
 }
 
-// Both gates, the way Flipper does it: on for everyone, or on for this actor. globalOnly
-// is not consulted here because setFlag refuses to add an actor to such a flag, so its
-// list is always empty — the server remains the authority either way.
+// Mirrors gate() in functions/src/flags/store.ts. The server stays the authority.
 export function gate(gates: Record<string, FlagGates>, key: string, uid: string | null): boolean {
   const flag = gates[key]
   if (!flag) return false
@@ -41,8 +37,7 @@ export function gate(gates: Record<string, FlagGates>, key: string, uid: string 
   return uid ? flag.actors.includes(uid) : false
 }
 
-// The unlock pass, held in memory only. Not sessionStorage: it is a bearer credential for
-// the flag admin, and re-entering the root credential after a reload is the cheaper cost.
+// Memory only: it is a bearer credential, so a reload should re-lock.
 let pass = ''
 
 export const unlocked = () => pass !== ''
@@ -82,8 +77,6 @@ async function adminCall<T>(payload?: unknown): Promise<T> {
   return body as T
 }
 
-// Exchanges the root credential for a short-lived pass. The caller keeps their own
-// session — this is closer to sudo than to a second sign-in.
 export async function unlock(username: string, password: string): Promise<void> {
   const res = await fetch(`${functionsBase}/adminUnlock`, {
     method: 'POST',

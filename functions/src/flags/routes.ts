@@ -5,15 +5,12 @@ import { callerFrom } from '../auth'
 import { isHlError } from '../errors'
 import { isRoot, listAllUsers, readFlags, seedFlags, setFlag, type FlagPatch } from './store'
 
-// GET lists every registered flag with its raw gates. POST changes one.
-// Root only, checked here rather than in rules, so the flag collection stays
-// client-write-false and there is exactly one way in.
+// Root checked here rather than in rules, so the collection stays client-write-false.
 export const flagsAdmin = onRequest({ cors: true }, async (req, res) => {
   try {
     const caller = await callerFrom(req)
 
-    // Two ways in: configured as root, or holding an unlock pass minted for this account
-    // by adminUnlock. The pass is scoped to one uid, so it cannot be handed to someone else.
+    // Configured as root, or holding a pass minted for this account. The pass is uid-scoped.
     const pass = await claimAdminToken(String(req.get('X-Admin-Token') ?? ''))
     const root =
       isRoot(caller.uid, caller.email, caller.emailVerified) || pass?.uid === caller.uid

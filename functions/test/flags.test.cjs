@@ -17,8 +17,7 @@ const ALICE = 'uid_alice'
 const BOB = 'uid_bob'
 
 // Flipper's two gates: the boolean gate opens it for everyone, the actor gate for a named
-// list. Either is enough, which is what makes "off for all but these three" expressible
-// without a second flag.
+// list.
 test('off with no actors is off for everyone', () => {
   assert.strictEqual(gate(flag(), ALICE), false)
 })

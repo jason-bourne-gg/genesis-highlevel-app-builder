@@ -2,8 +2,7 @@ const { test, throws, done, assert } = require('./harness.cjs')
 const { text, required, iso, tags, compact, contactFields } = require('../lib/hl/fields.js')
 
 // Write bodies arrive from code an LLM wrote from a one-line prompt, so every field is
-// allowlisted and coerced rather than forwarded. An unexpected field on a CRM record is
-// a silent data change.
+// allowlisted and coerced rather than forwarded.
 test('text trims', () => assert.strictEqual(text('  Asha  '), 'Asha'))
 test('text treats an all-whitespace value as absent', () => assert.strictEqual(text('   '), undefined))
 test('text treats null and undefined as absent', () => {

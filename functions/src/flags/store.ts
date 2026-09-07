@@ -6,9 +6,7 @@ import { FLAG_DEFS, findDef, type FlagDef } from './defs'
 
 export interface FlagDoc {
   enabled: boolean
-  // Uids only. This document is world-readable so the sign-in page can resolve a flag
-  // before anyone is signed in, and an email address is a real identifier — the admin UI
-  // resolves labels through flagsAdmin instead.
+  // Uids only: this document is world-readable, so no email addresses in it.
   actors: string[]
   updatedAt: number
   updatedBy: string
@@ -22,8 +20,7 @@ export async function readFlags(): Promise<FlagState[]> {
   const snap = await col().get()
   const stored = new Map(snap.docs.map((d) => [d.id, d.data() as Partial<FlagDoc>]))
 
-  // Driven by the registry, not by what happens to be in the collection, so a flag
-  // with no document yet still resolves to its default instead of vanishing.
+  // Driven by the registry, so a flag with no document yet still resolves to its default.
   return FLAG_DEFS.map((def) => {
     const doc = stored.get(def.key) ?? {}
     return {
@@ -36,9 +33,7 @@ export async function readFlags(): Promise<FlagState[]> {
   })
 }
 
-// Flipper's two gates: the boolean gate opens it for everyone, the actor gate for a
-// named list. Either is enough, which is what makes "off for all but these three"
-// expressible without a second flag.
+// Flipper's two gates: on for everyone, or on for a named list. Either is enough.
 export function gate(flag: FlagState, uid: string | null): boolean {
   if (flag.enabled) return true
   if (!uid || flag.globalOnly) return false
@@ -56,10 +51,8 @@ export async function flagOn(key: string, uid: string | null): Promise<boolean> 
   return flag ? gate(flag, uid) : false
 }
 
-// Standing root, from configuration rather than data: a row in Firestore that granted
-// root would be a row worth attacking. An unverified email is refused because it is
-// self-asserted at signup, so an allowlisted address nobody has registered yet is an
-// account anyone could claim. The other way in is an unlock pass — see admin/unlock.ts.
+// Configuration, never data. An unverified email is refused: it is self-asserted at
+// signup, so an allowlisted address nobody has claimed yet is an account anyone can take.
 export function isRoot(uid: string, email?: string, emailVerified = false): boolean {
   if (config.rootUids.includes(uid)) return true
   if (!email || !emailVerified) return false
@@ -67,17 +60,13 @@ export function isRoot(uid: string, email?: string, emailVerified = false): bool
 }
 
 export interface FlagPatch {
-  // The global gate.
   enabled?: boolean
-  // The actor gate, set explicitly rather than added/removed, so the request says what
-  // the toggle should end up as instead of what to do to it.
+  // Set explicitly rather than added/removed, so the request says what the toggle becomes.
   actorUid?: string
   on?: boolean
 }
 
-// Written as field-level updates rather than a read-modify-write of the whole document.
-// Two roots adding actors at the same moment would otherwise both read the same array and
-// the second write would silently drop the first addition.
+// Field-level, not a read-modify-write: two roots adding at once would lose one.
 export async function setFlag(
   key: string,
   patch: FlagPatch,
@@ -117,13 +106,10 @@ export interface AdminUser {
   createdAt: number
 }
 
-// One page is the admin SDK's maximum. Beyond that the page would need paging, and the
-// truncated flag is there so the UI can say so rather than quietly showing a subset.
+// The admin SDK's maximum for one page; `truncated` tells the UI when there are more.
 const USER_PAGE = 1000
 
-// Every account, so the admin can toggle a flag per user without knowing an address in
-// advance. Resolved live from Firebase Auth: emails are deliberately not mirrored into
-// the world-readable flag documents.
+// Resolved live, so emails never enter the world-readable flag documents.
 export async function listAllUsers(): Promise<{ users: AdminUser[]; truncated: boolean }> {
   const page = await getAuth().listUsers(USER_PAGE)
   const users = page.users

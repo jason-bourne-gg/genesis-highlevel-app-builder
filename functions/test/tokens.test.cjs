@@ -71,9 +71,8 @@ atest('an expired token is refreshed', async () => {
     )
 })
 
-  // The bug this guards: a refresh response can omit locationId, and replacing the
-  // document would blank it. Every later request would then send locationId= empty and
-  // quietly return nothing, which looks like an empty location rather than a fault.
+  // The bug this guards: a refresh response can omit locationId, and replacing the document
+  // would blank it.
 atest('a refresh that omits locationId does not blank it', async () => {
     await withTokens(
       { firestore: stored({ expiresAt: Date.now() - MIN }), fetch: () => refreshed() },
@@ -109,10 +108,8 @@ atest('a refresh that does return a locationId updates it', async () => {
     )
 })
 
-  // One resource request fans out over every calendar, so several callers hitting an
-  // expired token at the same instant is the common path, not a rare race. The loser of
-  // that race would spend an already-spent refresh token and break the connection for
-  // good, so the in-flight promise has to collapse them into one call.
+  // One resource request fans out over every calendar, so several callers hitting an expired
+  // token at the same instant is the common path, not a rare race.
 atest('concurrent callers share a single refresh', async () => {
     await withTokens(
       { firestore: stored({ expiresAt: Date.now() - MIN }), fetch: () => refreshed() },

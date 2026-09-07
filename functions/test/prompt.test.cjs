@@ -15,7 +15,6 @@ const WRITE_CALLS = [
 
 // The whole point of shipping this behind flags: with every flag off the model must see
 // exactly what it saw before flags existed, so turning them off is a rollback and not a
-// different code path.
 test('the exported constant is the all-flags-off surface', () =>
   assert.strictEqual(SYSTEM_PROMPT, systemPrompt(OFF)))
 
@@ -61,9 +60,8 @@ test('writes bring the calendar reads with them', () => {
   }
 })
 
-// Every documented call must be one the server will actually serve, or the model builds
-// a UI that 403s. This is the check that would have caught the writes block pointing at
-// hl.contacts.search while search was gated behind a different flag.
+// Every documented call must be one the server will actually serve, or the model builds a UI
+// that 403s.
 test('every documented hl call is reachable under the flags that documented it', () => {
   const { READ_GATES } = require('../lib/hl/proxy.js')
   const RESOURCE = {

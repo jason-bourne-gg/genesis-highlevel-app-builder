@@ -2,8 +2,7 @@ const { atest, run, assert } = require('./harness.cjs')
 const { withStubs } = require('./stub.cjs')
 
 // The throttle and the credential comparison are tested directly rather than through the
-// handler. Driving onRequest means building a request express and the cors middleware
-// will accept, and at that point the test is asserting the mock rather than the code.
+// handler.
 const CALLER = 'uid_alice'
 const OTHER = 'uid_bob'
 const configured = { ROOT_USERNAME: 'root', ROOT_PASSWORD: 'hunter2' }

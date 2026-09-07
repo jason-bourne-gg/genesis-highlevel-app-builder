@@ -1,7 +1,5 @@
 <script setup lang="ts">
-// A switch, because the state is what matters here rather than the action — reading a row
-// should not require working out what a button would do to it. shadcn-vue's switch is not
-// installed, and this needs 15 lines rather than a dependency.
+// shadcn-vue's switch is not installed, and this is smaller than adding it.
 const props = defineProps<{
   modelValue: boolean
   disabled?: boolean

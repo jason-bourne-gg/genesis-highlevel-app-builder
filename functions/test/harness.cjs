@@ -1,6 +1,4 @@
-// A test file here is a plain node script, which keeps the suite dependency-free but
-// means an assertion failure reports a stack rather than which case broke. This gives
-// each case a name and keeps going after a failure, so one run lists everything wrong.
+// Names each case and keeps going after a failure, so one run lists everything wrong.
 const assert = require('node:assert')
 
 let failures = 0
@@ -28,8 +26,7 @@ function throws(fn, matching) {
   })
 }
 
-// Async cases are queued and awaited in order, so a stubbed module is never swapped out
-// from under another case still running against it.
+// Awaited in order, so a stubbed module is never swapped out from under a running case.
 const queue = []
 
 function atest(name, fn) {

@@ -27,15 +27,8 @@ const drafts = ref<Record<string, string>>({})
 const monacoReady = ref(false)
 const monacoFailed = ref(false)
 
-// Monaco is a 3 MB chunk, so it is imported lazily. A rejection here used to be silent,
-// and the editor fell back to "Pick a file to open it." — a misleading empty state for
-// what is actually a failed download.
-//
-// The usual cause is a stale shell: index.html cached from an earlier deploy asks for a
-// chunk hash that is no longer in the release. Hosting's SPA rewrite then answers with
-// index.html and a 200, so the browser receives HTML where it expected a module. One
-// reload picks up the current shell and fixes it, so do that once and only once —
-// guarded in sessionStorage, because reloading on a genuine failure would loop.
+// A 3 MB lazy chunk. It fails when a stale shell asks for a hash no longer in the
+// release, and one reload fixes that — hence retry once, guarded against a loop.
 const RETRIED = 'monaco-chunk-retried'
 
 import('@/lib/monaco')
