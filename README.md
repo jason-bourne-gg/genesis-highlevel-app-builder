@@ -58,18 +58,32 @@ so any earlier version can be brought back.
 | What | URL |
 | --- | --- |
 | Frontend (Firebase Hosting) | https://genesysbe-cbd7e.web.app |
+| Feature flag admin | https://genesysbe-cbd7e.web.app/admin/flags |
 | Cloud Functions base | `https://us-central1-genesysbe-cbd7e.cloudfunctions.net` |
 | `generate` (direct Cloud Run URL) | `https://generate-ykls45eqcq-uc.a.run.app` |
 | Loom walkthrough | **TODO** |
 
-Under the functions base: `oauthStart`, `oauthCallback`,
-`hlProxy/{location|contacts|conversations|events}`, `hlDisconnect`,
-`previewToken`, `hlPreview/{resource}`.
+Under the functions base: `oauthStart`, `oauthCallback`, `hlDisconnect`,
+`previewToken`, `flagsAdmin`, `adminUnlock`, and the two proxies.
+
+The proxies serve the same resources, differing only in who may call them:
+`hlProxy/{resource}` takes a Firebase ID token, `hlPreview/{resource}` takes a preview
+badge because the sandboxed frame has no session to present.
+
+| Resource | Method | Gate |
+| --- | --- | --- |
+| `location`, `contacts`, `conversations`, `events` | GET | none |
+| `search?q=`, `messages?conversationId=` | GET | `hl_extended_reads` |
+| `calendars`, `slots?calendarId=&days=` | GET | either flag |
+| `createContact`, `updateContact`, `sendMessage`, `bookAppointment` | POST | `hl_writes` |
 
 `generate` is deliberately not one of them. It streams Claude's output as it is
 written, and streaming has to be called at its own Cloud Run address. Cloud Run is
 the Google service the functions actually run on, and it gives each one a second
 URL. Decision 1 explains why that matters.
+
+The flag admin is reachable by any signed-in account; the flags themselves stay hidden
+until the root credential is entered on the page. See Feature flags below.
 
 ## HighLevel setup
 
@@ -231,17 +245,33 @@ before they existed — the model even receives the byte-identical system prompt
 Each flag has two gates, the way Flipper does it: on for everyone, or on for a list of
 accounts. Either is enough, so "off for all but these three" needs no second flag.
 
-- The admin is at `/admin/flags`, root only.
-- Root signs in with `ROOT_USERNAME` / `ROOT_PASSWORD` from `functions/.env`, entered in
-  the email field. The `rootLogin` function checks them and returns a Firebase custom
-  token with a `root` claim, so the credential is never in the browser bundle and no
-  Firebase user has to be created first. Rate limited, 10 attempts per IP per 15 minutes.
+The admin is at `/admin/flags`. Pick a flag from the dropdown and every account in the
+project is listed with a switch each; the global gate sits above them and says plainly
+that it overrides the list.
+
+- **Any signed-in account can open the page.** The flags stay hidden until the root
+  credential is entered on it. `adminUnlock` compares that against `ROOT_USERNAME` /
+  `ROOT_PASSWORD` in `functions/.env` and returns a 30-minute pass, scoped to that
+  account and held in memory by the page, so the caller keeps their own session. Closer
+  to sudo than to a second sign-in, and a reload re-locks it.
+- **Not a persistent claim.** An earlier version signed a root username in as a real
+  Firebase user carrying a permanent `root` claim, which made the rate limit bypassable:
+  that account could be signed in directly through Firebase's own REST endpoint with the
+  public web API key, and clearing the environment variables did not revoke it.
+- Rate limited to 10 attempts per account per 15 minutes, plus a shared 60 so creating
+  accounts cannot farm fresh budgets. Keyed on the authenticated uid rather than an
+  address, because `X-Forwarded-For` is a list the caller can prepend to and neither end
+  of it is safe to key a limit on. It fails closed.
+- Emails are resolved live from Firebase Auth for the admin UI and never written into the
+  flag documents, which are world-readable because the sign-in page has to resolve
+  `google_login` before anyone is signed in.
 - Flags are read straight from Firestore, so flipping one takes effect in every open tab
-  with no reload. Rules allow reads and deny writes; `flagsAdmin` is the only way in.
+  with no reload. Rules allow reads and deny writes; `flagsAdmin` is the only way in, and
+  it re-checks root on every call.
 - `generate` resolves the flags before building the prompt, so the model is only ever
-  told about calls that will actually work for that user.
-- Writes are gated in five places: the prompt, `hl.js`, the preview proxy, the app proxy,
-  and a per-badge write budget.
+  told about calls that will actually work for that user. A test asserts exactly that:
+  every documented `hl` call must be one the proxy would serve under the flags that
+  documented it.
 
 ## Writes
 
