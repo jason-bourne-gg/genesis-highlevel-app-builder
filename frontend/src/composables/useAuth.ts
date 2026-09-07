@@ -13,11 +13,15 @@ export const authReady = auth.ready
 
 export function useAuth() {
   const signedIn = computed(() => user.value !== null)
+  const isRoot = computed(() => user.value?.root === true)
 
-  async function signIn(email: string, password: string) {
+  // One entry point for both: an identifier without an @ is a root username.
+  async function signIn(identifier: string, password: string) {
     pending.value = true
     try {
-      user.value = await auth.signIn(email, password)
+      user.value = auth.looksLikeUsername(identifier)
+        ? await auth.signInAsRoot(identifier, password)
+        : await auth.signIn(identifier, password)
     } finally {
       pending.value = false
     }
@@ -32,10 +36,19 @@ export function useAuth() {
     }
   }
 
+  async function signInWithGoogle() {
+    pending.value = true
+    try {
+      user.value = await auth.signInWithGoogle()
+    } finally {
+      pending.value = false
+    }
+  }
+
   async function signOut() {
     await auth.signOut()
     user.value = null
   }
 
-  return { user, pending, signedIn, signIn, signUp, signOut }
+  return { user, pending, signedIn, isRoot, signIn, signUp, signInWithGoogle, signOut }
 }

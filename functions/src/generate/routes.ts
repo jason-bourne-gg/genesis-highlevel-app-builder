@@ -5,11 +5,12 @@ import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
 import { ANTHROPIC_API_KEY, config } from '../config'
 import { isHlError } from '../errors'
+import { flagOn } from '../flags/store'
 import { HL_CLIENT_SOURCE } from './hlClient'
 import { resolveModel, supportsAdaptiveThinking } from './models'
 import { priceUsage, type GenerationUsage } from './usage'
 import { FileStreamParser } from './parser'
-import { SYSTEM_PROMPT } from './prompt'
+import { systemPrompt } from './prompt'
 import { asFiles, stripFence, validateShell } from './validate'
 import { loadContext, persist, type ProjectFile, type StoredMessage } from './store'
 
@@ -57,8 +58,18 @@ export const generate = onRequest(
       return void res.status(status).json({ error: (e as Error).message })
     }
 
+    // Resolved once and used for both the prompt and the log line, so what the model is
+    // told it can do always matches what the proxy will actually allow.
+    let writesOn = false
+    let extendedReadsOn = false
     let context
     try {
+      // Both resolved before the prompt is built, so what the model is told it can call
+      // is exactly what the proxy will allow for this user.
+      ;[writesOn, extendedReadsOn] = await Promise.all([
+        flagOn('hl_writes', uid),
+        flagOn('hl_extended_reads', uid),
+      ])
       context = await loadContext(uid, projectId)
     } catch (e) {
       const status = isHlError(e) ? e.status : 500
@@ -127,7 +138,7 @@ export const generate = onRequest(
           model,
           // Comfortably more than three small files need, and under Haiku's cap.
           max_tokens: 32000,
-          system: SYSTEM_PROMPT,
+          system: systemPrompt({ writes: writesOn, extendedReads: extendedReadsOn }),
           // Gives the chat something to show during the pause before the first file.
           ...(adaptive
             ? {
@@ -212,6 +223,8 @@ export const generate = onRequest(
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
       costUsd: usage.costUsd,
+      writes: writesOn,
+      extendedReads: extendedReadsOn,
       outcome: aborted ? 'stopped' : failure ? 'failed' : 'complete',
     })
 

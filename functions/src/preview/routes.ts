@@ -1,8 +1,17 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
 import { isHlError } from '../errors'
+import { flagOn } from '../flags/store'
+import { queryFrom, readAllowed } from '../hl/proxy'
 import { resources } from '../hl/resources'
-import { assertOwns, claimPreviewToken, mintPreviewToken, sweepExpired } from './tokens'
+import { auditWrite, writers } from '../hl/writes'
+import {
+  assertOwns,
+  claimPreviewToken,
+  claimPreviewWrite,
+  mintPreviewToken,
+  sweepExpired,
+} from './tokens'
 
 // Requires a real Firebase login, so a token is only ever issued for the caller's own project.
 export const previewToken = onRequest({ cors: true }, async (req, res) => {
@@ -14,7 +23,8 @@ export const previewToken = onRequest({ cors: true }, async (req, res) => {
     const grant = await mintPreviewToken(uid, projectId)
     // Opportunistic, and never allowed to fail the mint.
     void sweepExpired().catch(() => {})
-    res.json(grant)
+    // The frame needs to know whether to offer write controls at all.
+    res.json({ ...grant, writes: await flagOn('hl_writes', uid) })
   } catch (e) {
     res.status(isHlError(e) ? e.status : 400).json({ error: (e as Error).message })
   }
@@ -25,17 +35,46 @@ export const previewToken = onRequest({ cors: true }, async (req, res) => {
 export const hlPreview = onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*')
   res.set('Access-Control-Allow-Headers', 'X-Preview-Token, Content-Type')
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.set('Access-Control-Max-Age', '3600')
   if (req.method === 'OPTIONS') return void res.status(204).send('')
 
-  const resource = req.path.replace(/^\/+|\/+$/g, '').split('/').pop() ?? ''
-  const handler = Object.hasOwn(resources, resource) ? resources[resource] : undefined
-  if (!handler) return void res.status(404).json({ error: `Unknown resource ${resource}` })
+  const name = req.path.replace(/^\/+|\/+$/g, '').split('/').pop() ?? ''
+  const token = String(req.get('X-Preview-Token') ?? '')
 
   try {
-    const token = String(req.get('X-Preview-Token') ?? '')
-    const grant = await claimPreviewToken(token)
-    res.json(await handler(grant.uid))
+    if (Object.hasOwn(writers, name)) {
+      if (req.method !== 'POST') return void res.status(405).json({ error: 'Writes use POST' })
+
+      // Spends one from the badge's budget as part of claiming it.
+      const grant = await claimPreviewWrite(token)
+      if (!(await flagOn('hl_writes', grant.uid))) {
+        return void res.status(403).json({
+          error: 'HighLevel writes are turned off for this account.',
+          code: 'writes_disabled',
+        })
+      }
+
+      const body = (req.body ?? {}) as Record<string, unknown>
+      const result = await writers[name](grant.uid, body)
+      auditWrite(name, grant.uid, body, `preview:${grant.projectId}`)
+      return void res.json(result)
+    }
+
+    if (Object.hasOwn(resources, name)) {
+      const grant = await claimPreviewToken(token)
+      if (!(await readAllowed(name, grant.uid))) {
+        return void res.status(403).json({
+          error: `The ${name} resource is not enabled for this account.`,
+          code: 'resource_disabled',
+        })
+      }
+      return void res.json(
+        await resources[name](grant.uid, queryFrom(req.query as Record<string, unknown>)),
+      )
+    }
+
+    res.status(404).json({ error: `Unknown resource ${name}` })
   } catch (e) {
     const status = isHlError(e) ? e.status : 500
     res.status(status).json({

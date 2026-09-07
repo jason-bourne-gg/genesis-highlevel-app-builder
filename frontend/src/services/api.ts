@@ -7,9 +7,16 @@ export class ApiError extends Error {
   }
 }
 
-export async function callFunction<T>(path: string): Promise<T> {
+export async function callFunction<T>(path: string, payload?: unknown): Promise<T> {
+  // A body implies a POST. Every read here is a GET, so the method follows the payload
+  // rather than being passed separately at every call site.
   const res = await fetch(`${functionsBase}${path}`, {
-    headers: { Authorization: `Bearer ${await idToken()}` },
+    method: payload === undefined ? 'GET' : 'POST',
+    headers: {
+      Authorization: `Bearer ${await idToken()}`,
+      ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
   })
 
   const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string }

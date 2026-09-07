@@ -4,6 +4,9 @@ import { defineSecret } from 'firebase-functions/params'
 // is encrypted at rest and does not show up in the Cloud Run service definition.
 export const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY')
 
+const split = (value: string | undefined): string[] =>
+  (value ?? '').split(',').map((v) => v.trim()).filter(Boolean)
+
 function required(name: string): string {
   const value = process.env[name]
   if (!value) throw new Error(`Missing environment variable ${name}`)
@@ -34,6 +37,17 @@ export const config = {
       .filter(Boolean)
     return [...new Set([...configured, ...hosting])]
   },
+
+  // Who may open the feature-flag admin. Configuration, not data — a Firestore row
+  // that granted root would be a row worth attacking. ROOT_UIDS is unambiguous;
+  // ROOT_EMAILS is only honoured for a verified address (see flags/store.ts).
+  // Root sign-in credential. Server side only — never compiled into the frontend bundle.
+  // Unset means root sign-in is disabled entirely.
+  get rootUsername() { return (process.env.ROOT_USERNAME ?? '').trim() },
+  get rootPassword() { return process.env.ROOT_PASSWORD ?? '' },
+
+  get rootUids(): string[] { return split(process.env.ROOT_UIDS) },
+  get rootEmails(): string[] { return split(process.env.ROOT_EMAILS).map((e) => e.toLowerCase()) },
 
   get anthropicKey() { return ANTHROPIC_API_KEY.value() },
   get anthropicModel() { return process.env.ANTHROPIC_MODEL ?? 'claude-opus-5' },
