@@ -4,6 +4,7 @@ import { VueMonacoEditor, type MonacoEditor as Monaco } from '@guolao/vue-monaco
 import type { editor } from 'monaco-editor'
 import { XIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
 import FileTree from './FileTree.vue'
 import { languageFor } from '@/lib/preview'
 import { useGeneration } from '@/composables/useGeneration'
@@ -24,7 +25,39 @@ const active = ref<string | null>(null)
 const drafts = ref<Record<string, string>>({})
 
 const monacoReady = ref(false)
-import('@/lib/monaco').then(() => (monacoReady.value = true))
+const monacoFailed = ref(false)
+
+// Monaco is a 3 MB chunk, so it is imported lazily. A rejection here used to be silent,
+// and the editor fell back to "Pick a file to open it." — a misleading empty state for
+// what is actually a failed download.
+//
+// The usual cause is a stale shell: index.html cached from an earlier deploy asks for a
+// chunk hash that is no longer in the release. Hosting's SPA rewrite then answers with
+// index.html and a 200, so the browser receives HTML where it expected a module. One
+// reload picks up the current shell and fixes it, so do that once and only once —
+// guarded in sessionStorage, because reloading on a genuine failure would loop.
+const RETRIED = 'monaco-chunk-retried'
+
+import('@/lib/monaco')
+  .then(() => {
+    monacoReady.value = true
+    try {
+      sessionStorage.removeItem(RETRIED)
+    } catch {
+      // Storage is not available in some contexts, and that must not break the editor.
+    }
+  })
+  .catch(() => {
+    let retried = true
+    try {
+      retried = sessionStorage.getItem(RETRIED) === '1'
+      if (!retried) sessionStorage.setItem(RETRIED, '1')
+    } catch {
+      // Without storage we cannot tell a first failure from a loop, so never auto-reload.
+    }
+    if (retried) monacoFailed.value = true
+    else window.location.reload()
+  })
 
 let instance: editor.IStandaloneCodeEditor | null = null
 
@@ -85,6 +118,15 @@ function onMountEditor(ed: editor.IStandaloneCodeEditor, monaco: Monaco) {
   instance = ed
   ed.updateOptions({ readOnly: generating.value })
   ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, save)
+}
+
+function hardReload() {
+  try {
+    sessionStorage.removeItem(RETRIED)
+  } catch {
+    // Nothing to clear.
+  }
+  window.location.reload()
 }
 
 function onWindowKeydown(event: KeyboardEvent) {
@@ -176,6 +218,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown))
           @change="onChange"
           @mount="onMountEditor"
         />
+        <div
+          v-else-if="monacoFailed"
+          class="grid h-full place-items-center px-6 text-center text-sm"
+        >
+          <div class="max-w-xs space-y-3">
+            <p class="font-medium">The editor could not load</p>
+            <p class="text-muted-foreground">
+              Its code failed to download. Your files are safe — the preview beside this is
+              reading them.
+            </p>
+            <Button size="sm" variant="outline" @click="hardReload">Reload the page</Button>
+          </div>
+        </div>
         <div
           v-else
           class="text-muted-foreground grid h-full place-items-center px-6 text-center text-sm"
