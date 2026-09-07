@@ -1,17 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { authReady, useAuth } from '@/composables/useAuth'
+import { safeRedirect } from '@/lib/redirect'
 import AdminFlags from '@/views/AdminFlags.vue'
 import Auth from '@/views/Auth.vue'
 import Dashboard from '@/views/Dashboard.vue'
 import Workspace from '@/views/Workspace.vue'
-
-// Only same-origin paths. A protocol-relative value like //evil.com is a valid path to
-// the browser and would make this an open redirect.
-export function safeRedirect(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  if (!value.startsWith('/') || value.startsWith('//')) return null
-  return value
-}
 
 const router = createRouter({
   history: createWebHistory(),

@@ -140,11 +140,25 @@ VITE_FUNCTIONS_BASE=http://localhost:5001/genesysbe-cbd7e/us-central1
 VITE_GENERATE_URL=http://localhost:5001/genesysbe-cbd7e/us-central1/generate
 ```
 
-`npm test` runs the stream-parser test. The parser splits Claude's output into
-separate files as it arrives, and it is the one place here where a bug is
-invisible: a file boundary marker split across two chunks corrupts a file
-silently. The test feeds the same output through at every possible split point and
-checks the result is identical each time.
+`npm test` at the repo root runs everything: 362 cases across eleven files in
+`functions/test` (plain node, no framework), then 56 in `frontend/test` (vitest).
+`npm run test:functions` and `npm run test:frontend` run one half.
+
+Two are worth knowing about:
+
+- **The stream parser**, fed the same output at every possible split point. A file
+  boundary marker split across two chunks corrupts a file silently, which is the one
+  place here where a bug produces no symptom at all.
+- **The shell contract**, in `frontend/test/contract.spec.ts`. `validate.ts` on the
+  server decides whether a shell is acceptable and `preview.ts` in the browser stitches
+  the files together by the same three tags, in two packages that never import each
+  other. If they drift, the server saves a generation the browser renders blank, with no
+  error anywhere. The test runs thirteen plausible shells through both halves and fails
+  if their verdicts disagree.
+
+Still untested: everything that needs Firestore or a network call — the OAuth exchange,
+the single-use token refresh, the preview pass and its write budget, and cancellation.
+Those need the emulator, which needs a JVM.
 
 **The emulator cannot connect a HighLevel account.** HighLevel has to redirect your
 browser to our callback URL, and it cannot reach `localhost`. That flow is tested

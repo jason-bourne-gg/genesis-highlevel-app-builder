@@ -1,55 +1,10 @@
 import { logger } from 'firebase-functions/v2'
 import { HlError } from '../errors'
 import { hlSend, locationIdFor } from './client'
-
-// Every write is field-allowlisted here rather than forwarded. The body arrives from
-// code an LLM wrote, so "pass it through and let HighLevel validate" is not a position
-// worth defending — an unexpected field on a CRM record is a silent data change.
-type Body = Record<string, unknown>
-
-const text = (v: unknown, max = 500): string | undefined => {
-  if (v == null) return undefined
-  const s = String(v).trim()
-  if (!s) return undefined
-  if (s.length > max) throw new HlError('invalid_write', `Value longer than ${max} characters`, 400)
-  return s
-}
-
-const required = (v: unknown, name: string, max = 500): string => {
-  const s = text(v, max)
-  if (!s) throw new HlError('invalid_write', `${name} is required`, 400)
-  return s
-}
-
-const iso = (v: unknown, name: string): string => {
-  const s = required(v, name, 40)
-  if (Number.isNaN(Date.parse(s))) {
-    throw new HlError('invalid_write', `${name} must be an ISO date-time`, 400)
-  }
-  return s
-}
-
-const tags = (v: unknown): string[] | undefined => {
-  if (!Array.isArray(v)) return undefined
-  const out = v.map((t) => String(t).trim()).filter(Boolean).slice(0, 20)
-  return out.length ? out : undefined
-}
-
-// Drops keys whose value came back undefined, so a partial body never sends nulls
-// that would blank a field on the HighLevel record.
-const compact = (o: Body): Body => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined))
-
-const CONTACT_FIELDS = (body: Body): Body =>
-  compact({
-    firstName: text(body.firstName, 100),
-    lastName: text(body.lastName, 100),
-    email: text(body.email, 200),
-    phone: text(body.phone, 40),
-    tags: tags(body.tags),
-  })
+import { contactFields, iso, required, text, type Body } from './fields'
 
 async function createContact(uid: string, body: Body): Promise<unknown> {
-  const fields = CONTACT_FIELDS(body)
+  const fields = contactFields(body)
   if (!fields.email && !fields.phone) {
     throw new HlError('invalid_write', 'A contact needs at least an email or a phone number', 400)
   }
@@ -63,7 +18,7 @@ async function createContact(uid: string, body: Body): Promise<unknown> {
 
 async function updateContact(uid: string, body: Body): Promise<unknown> {
   const id = required(body.id, 'id', 100)
-  const fields = CONTACT_FIELDS(body)
+  const fields = contactFields(body)
   if (!Object.keys(fields).length) {
     throw new HlError('invalid_write', 'Nothing to update', 400)
   }
