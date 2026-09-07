@@ -1,3 +1,4 @@
+import { HlError } from '../errors'
 import { hlGet } from './client'
 import { accessTokenFor } from './tokens'
 
@@ -5,6 +6,8 @@ import { accessTokenFor } from './tokens'
 const str = (v: unknown, fallback = '') => (v == null ? fallback : String(v))
 
 const EVENT_WINDOW_DAYS = 30
+
+export type Query = Record<string, string | undefined>
 
 export interface Contact {
   id: string
@@ -44,20 +47,20 @@ export async function location(uid: string): Promise<{ location: { id: string; n
   return { location: { id: locationId, name } }
 }
 
+const toContact = (c: Record<string, unknown>): Contact => ({
+  id: str(c.id),
+  firstName: str(c.firstName),
+  lastName: str(c.lastName),
+  email: str(c.email),
+  phone: str(c.phone),
+  tags: Array.isArray(c.tags) ? c.tags.map((t) => str(t)) : [],
+})
+
 export async function contacts(uid: string): Promise<{ contacts: Contact[] }> {
   const res = await hlGet<{ contacts?: Record<string, unknown>[] }>(uid, '/contacts/', {
     limit: '100',
   })
-  return {
-    contacts: (res.contacts ?? []).map((c) => ({
-      id: str(c.id),
-      firstName: str(c.firstName),
-      lastName: str(c.lastName),
-      email: str(c.email),
-      phone: str(c.phone),
-      tags: Array.isArray(c.tags) ? c.tags.map((t) => str(t)) : [],
-    })),
-  }
+  return { contacts: (res.contacts ?? []).map(toContact) }
 }
 
 export async function conversations(uid: string): Promise<{ conversations: Conversation[] }> {
@@ -109,9 +112,118 @@ export async function events(uid: string): Promise<{ events: CalendarEvent[] }> 
   }
 }
 
-export const resources: Record<string, (uid: string) => Promise<unknown>> = {
+export interface Calendar {
+  id: string
+  name: string
+}
+
+export interface Message {
+  id: string
+  direction: string
+  body: string
+  createdAt: string
+}
+
+export interface Slot {
+  startTime: string
+  endTime: string
+}
+
+// Exposed so a booking UI can pick a calendar. Previously resolved only internally
+// by events(), which meant a generated app could read appointments but not create one.
+export async function calendars(uid: string): Promise<{ calendars: Calendar[] }> {
+  const res = await hlGet<{ calendars?: Record<string, unknown>[] }>(uid, '/calendars/')
+  return {
+    calendars: (res.calendars ?? []).map((c) => ({
+      id: str(c.id),
+      name: str(c.name, 'Calendar'),
+    })),
+  }
+}
+
+// Server-side contact search. The generated apps used to filter the 100-row page in the
+// browser, which silently misses anyone past the cap.
+export async function search(
+  uid: string,
+  query: Query = {},
+): Promise<{ contacts: Contact[] }> {
+  const term = (query.q ?? '').trim()
+  if (!term) return { contacts: [] }
+  const res = await hlGet<{ contacts?: Record<string, unknown>[] }>(uid, '/contacts/', {
+    limit: '100',
+    query: term,
+  })
+  return { contacts: (res.contacts ?? []).map(toContact) }
+}
+
+// The message thread inside one conversation. conversations.list() only ever returned
+// the last message body, so "show me the last five messages" was unbuildable.
+export async function messages(
+  uid: string,
+  query: Query = {},
+): Promise<{ messages: Message[] }> {
+  const id = (query.conversationId ?? '').trim()
+  if (!id) throw new HlError('invalid_request', 'conversationId is required', 400)
+
+  const res = await hlGet<{ messages?: { messages?: Record<string, unknown>[] } | Record<string, unknown>[] }>(
+    uid,
+    `/conversations/${encodeURIComponent(id)}/messages`,
+  )
+  // HighLevel has returned this both as an array and as { messages: [...] }.
+  const raw = Array.isArray(res.messages) ? res.messages : (res.messages?.messages ?? [])
+  return {
+    messages: raw.map((m) => ({
+      id: str(m.id),
+      direction: str(m.direction, 'inbound'),
+      body: str(m.body),
+      createdAt: str(m.dateAdded, new Date().toISOString()),
+    })),
+  }
+}
+
+// Availability, so a booking UI can offer times that are actually free rather than
+// letting someone pick a slot HighLevel will reject.
+export async function slots(uid: string, query: Query = {}): Promise<{ slots: Slot[] }> {
+  const calendarId = (query.calendarId ?? '').trim()
+  if (!calendarId) throw new HlError('invalid_request', 'calendarId is required', 400)
+
+  const days = Math.min(Math.max(Number(query.days ?? 14) || 14, 1), EVENT_WINDOW_DAYS)
+  const res = await hlGet<Record<string, unknown>>(
+    uid,
+    `/calendars/${encodeURIComponent(calendarId)}/free-slots`,
+    {
+      startDate: String(Date.now()),
+      endDate: String(Date.now() + days * 86400_000),
+    },
+  )
+
+  // The response is keyed by date, each day holding a slots array of ISO strings.
+  const out: Slot[] = []
+  for (const value of Object.values(res)) {
+    const day = value as { slots?: unknown }
+    if (!Array.isArray(day?.slots)) continue
+    for (const start of day.slots) {
+      const startTime = str(start)
+      if (!startTime || Number.isNaN(Date.parse(startTime))) continue
+      out.push({
+        startTime,
+        endTime: new Date(Date.parse(startTime) + 30 * 60_000).toISOString(),
+      })
+    }
+  }
+  return { slots: out.slice(0, 200) }
+}
+
+export const resources: Record<string, (uid: string, query?: Query) => Promise<unknown>> = {
   location,
   contacts,
   conversations,
   events,
+  calendars,
+  search,
+  messages,
+  slots,
 }
+
+// Reads that mutate nothing but need a parameter, so they are still GETs.
+export const PARAMETERISED = new Set(['search', 'messages', 'slots'])

@@ -198,6 +198,44 @@ Two edges are load-bearing:
 - **The frame never receives a HighLevel token.** It gets a short-lived pass scoped
   to one project, and the proxy attaches the real credential on the server.
 
+## Feature flags
+
+Three flags, all off by default. With every flag off the app behaves exactly as it did
+before they existed — the model even receives the byte-identical system prompt.
+
+- `hl_writes` — generated apps can create and update contacts, send messages and book
+  appointments. Brings `hl.calendars.list()` and `hl.calendars.slots()` with it, because
+  booking needs a calendar and a free time.
+- `hl_extended_reads` — adds `hl.contacts.search()` and `hl.conversations.messages()`.
+- `google_login` — shows "Continue with Google" on the sign-in page. Read before anyone
+  is signed in, so it is the one flag that cannot be targeted at a user.
+
+Each flag has two gates, the way Flipper does it: on for everyone, or on for a list of
+accounts. Either is enough, so "off for all but these three" needs no second flag.
+
+- The admin is at `/admin/flags`, root only.
+- Root signs in with `ROOT_USERNAME` / `ROOT_PASSWORD` from `functions/.env`, entered in
+  the email field. The `rootLogin` function checks them and returns a Firebase custom
+  token with a `root` claim, so the credential is never in the browser bundle and no
+  Firebase user has to be created first. Rate limited, 10 attempts per IP per 15 minutes.
+- Flags are read straight from Firestore, so flipping one takes effect in every open tab
+  with no reload. Rules allow reads and deny writes; `flagsAdmin` is the only way in.
+- `generate` resolves the flags before building the prompt, so the model is only ever
+  told about calls that will actually work for that user.
+- Writes are gated in five places: the prompt, `hl.js`, the preview proxy, the app proxy,
+  and a per-badge write budget.
+
+## Writes
+
+- `hl.contacts.create` / `update`, `hl.conversations.send`, `hl.calendars.book`.
+- Every write opens a confirmation dialog rendered by `hl.js` in a shadow root. The model
+  cannot skip it, because calling the method is the only route to the endpoint it has.
+- That stops mistakes, not malice: the badge sits in the same document as the generated
+  code. A server-side field allowlist, a 25-write budget per badge and an audit log are
+  what cover the rest.
+- Fields are allowlisted and coerced server side. `locationId` is never sent on an update,
+  because including it is how a record moves between sub-accounts.
+
 ## Architecture decisions
 
 1. **The streaming endpoint is called at its own Cloud Run address, never through
@@ -275,10 +313,9 @@ Two edges are load-bearing:
 
 ## What I would improve
 
-- **Generated apps can only read.** The proxy exposes four read-only calls, so
-  "let me update this contact's phone number" cannot be satisfied at all. Adding
-  writes means a small set of safe changes, each confirmed in the UI, because the
-  code requesting it was written by a model.
+- **Writes have no undo.** They are behind the `hl_writes` flag, confirmed in the UI
+  and budgeted per preview, but nothing reverses one. A short journal of recent
+  writes with a revert action is the missing half.
 
 - **Pagination and caching for HighLevel data.** Contacts stop at 100,
   conversations at 50, appointments at a 30-day forward window, with no paging and

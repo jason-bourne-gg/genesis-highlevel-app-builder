@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { ArrowLeftIcon, HistoryIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import ApiModeTags from '@/components/ApiModeTags.vue'
 import ConnectionBadge from '@/components/ConnectionBadge.vue'
 import DevMenu from '@/components/DevMenu.vue'
 import UserMenu from '@/components/UserMenu.vue'
@@ -42,6 +43,7 @@ ready.then(() => {
       </Button>
       <span class="truncate font-medium tracking-tight">{{ project?.name ?? 'Loading…' }}</span>
       <ConnectionBadge />
+      <ApiModeTags />
       <div class="flex-1" />
       <DevMenu v-if="devMode" />
       <Button variant="outline" size="sm" @click="historyOpen = true">
