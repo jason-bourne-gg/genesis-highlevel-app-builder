@@ -95,9 +95,13 @@ sub-account with data in it.
    draft. A draft is enough to install into your own location.
 2. **Copy the client keys** from `MANAGE > Secrets > Client keys` into
    `HL_CLIENT_ID` and `HL_CLIENT_SECRET`.
-3. **Tick the read scopes** and put the same list in `HL_SCOPES`. A scope is one
-   named permission:
+3. **Tick the scopes** and put the same list in `HL_SCOPES`. A scope is one named
+   permission. The five reads are always needed:
    `locations.readonly contacts.readonly conversations.readonly calendars.readonly calendars/events.readonly`
+   The `hl_writes` flag additionally needs
+   `contacts.write conversations/message.write calendars/events.write`. Tick them now
+   even if the flag stays off — an install *is* the grant, so adding a scope later means
+   uninstalling and re-authorising.
 4. **Register the redirect URL** under `Advanced Settings > Auth > Redirect URLs`.
    That is where HighLevel returns the browser after you approve access, and it
    must match `HL_REDIRECT_URI` exactly:
@@ -154,10 +158,10 @@ VITE_FUNCTIONS_BASE=http://localhost:5001/genesysbe-cbd7e/us-central1
 VITE_GENERATE_URL=http://localhost:5001/genesysbe-cbd7e/us-central1/generate
 ```
 
-`npm test` at the repo root runs everything: 483 cases across eighteen files in
-`functions/test` (plain node, no framework), then 56 in `frontend/test` (vitest).
-`npm run test:functions` and `npm run test:frontend` run one half.
-`npm run coverage --prefix functions` reports 91% of statements and branches.
+`npm test` at the repo root runs everything — `functions/test` on plain node with no
+framework, then `frontend/test` on vitest. `npm run test:functions` and
+`npm run test:frontend` run one half; `npm run coverage --prefix functions` reports
+coverage, currently 91% of statements and branches.
 
 Two are worth knowing about:
 
@@ -195,12 +199,13 @@ flowchart LR
     end
 
     subgraph firebase [Firebase]
-        AUTH[Auth<br/>email and password]
+        AUTH[Auth<br/>password · Google behind a flag]
         DB[(Firestore<br/>projects, files<br/>messages, snapshots)]
         GEN[generate<br/>streams the model]
         OAUTH[oauthStart<br/>oauthCallback]
         TOKEN[previewToken]
         PROXY[hlProxy<br/>hlPreview]
+        FLAGS[flagsAdmin<br/>adminUnlock]
     end
 
     CLAUDE[Claude API]
@@ -215,6 +220,9 @@ flowchart LR
     SPA --> OAUTH
     OAUTH -->|swaps code for tokens| HL
     OAUTH -->|tokens, unreadable by any browser| DB
+    SPA --> FLAGS
+    FLAGS -->|resolves per user| DB
+    DB -->|which surface this account gets| GEN
     SPA --> TOKEN
     TOKEN -->|short lived pass| FRAME
     FRAME -->|asks for contacts| PROXY
@@ -361,9 +369,13 @@ that it overrides the list.
 
 ## What I would improve
 
-- **Writes have no undo.** They are behind the `hl_writes` flag, confirmed in the UI
-  and budgeted per preview, but nothing reverses one. A short journal of recent
-  writes with a revert action is the missing half.
+- **The generated-code surface is not fully hardened.** Writes are flag-gated,
+  confirmed in the UI and budgeted per preview, but nothing reverses one — a journal
+  with a revert action is the missing half, and what I would build before turning
+  writes on for anyone but myself. Separately the sandbox is a data boundary and not a
+  resource one: generated code cannot reach the page or its storage, but an infinite
+  loop hangs that tab and outbound `fetch` is unrestricted. A CSP on the frame closes
+  the second.
 
 - **Pagination and caching for HighLevel data.** Contacts stop at 100,
   conversations at 50, appointments at a 30-day forward window, with no paging and
