@@ -50,10 +50,20 @@ export const lock = () => {
   pass = ''
 }
 
+export interface AdminUser {
+  uid: string
+  email: string
+  provider: string
+  createdAt: number
+}
+
 export interface AdminView {
   root: boolean
   flags: FlagState[]
-  labels: Record<string, string>
+  users: AdminUser[]
+  // True when there are more accounts than one page, so the UI can say so rather than
+  // quietly showing a subset.
+  truncated: boolean
 }
 
 async function adminCall<T>(payload?: unknown): Promise<T> {
@@ -93,9 +103,9 @@ export const loadAdminFlags = () => adminCall<AdminView>()
 
 export interface FlagPatch {
   enabled?: boolean
-  addActor?: string
-  removeActor?: string
+  actorUid?: string
+  on?: boolean
 }
 
 export const patchFlag = (key: string, patch: FlagPatch) =>
-  adminCall<{ flag: FlagState; labels: Record<string, string> }>({ key, patch })
+  adminCall<{ flag: FlagState }>({ key, patch })

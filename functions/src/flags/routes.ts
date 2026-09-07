@@ -3,14 +3,7 @@ import { logger } from 'firebase-functions/v2'
 import { claimAdminToken } from '../admin/unlock'
 import { callerFrom } from '../auth'
 import { isHlError } from '../errors'
-import {
-  isRoot,
-  labelActors,
-  readFlags,
-  seedFlags,
-  setFlag,
-  type FlagPatch,
-} from './store'
+import { isRoot, listAllUsers, readFlags, seedFlags, setFlag, type FlagPatch } from './store'
 
 // GET lists every registered flag with its raw gates. POST changes one.
 // Root only, checked here rather than in rules, so the flag collection stays
@@ -33,9 +26,8 @@ export const flagsAdmin = onRequest({ cors: true }, async (req, res) => {
 
     if (req.method === 'GET') {
       await seedFlags()
-      const flags = await readFlags()
-      const labels = await labelActors([...new Set(flags.flatMap((f) => f.actors))])
-      return void res.json({ root: true, flags, labels })
+      const [flags, accounts] = await Promise.all([readFlags(), listAllUsers()])
+      return void res.json({ root: true, flags, ...accounts })
     }
 
     if (req.method === 'POST') {
@@ -52,11 +44,7 @@ export const flagsAdmin = onRequest({ cors: true }, async (req, res) => {
         actors: updated.actors.length,
         by: label,
       })
-      return void res.json({
-        root: true,
-        flag: updated,
-        labels: await labelActors(updated.actors),
-      })
+      return void res.json({ root: true, flag: updated })
     }
 
     res.status(405).json({ error: 'Use GET or POST' })

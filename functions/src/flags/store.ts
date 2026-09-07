@@ -67,9 +67,12 @@ export function isRoot(uid: string, email?: string, emailVerified = false): bool
 }
 
 export interface FlagPatch {
+  // The global gate.
   enabled?: boolean
-  addActor?: string
-  removeActor?: string
+  // The actor gate, set explicitly rather than added/removed, so the request says what
+  // the toggle should end up as instead of what to do to it.
+  actorUid?: string
+  on?: boolean
 }
 
 // Written as field-level updates rather than a read-modify-write of the whole document.
@@ -87,7 +90,7 @@ export async function setFlag(
 
   if (typeof patch.enabled === 'boolean') update.enabled = patch.enabled
 
-  if (patch.addActor) {
+  if (patch.actorUid) {
     if (def.globalOnly) {
       throw new HlError(
         'global_only',
@@ -95,18 +98,9 @@ export async function setFlag(
         400,
       )
     }
-    const email = patch.addActor.trim().toLowerCase()
-    let user
-    try {
-      user = await getAuth().getUserByEmail(email)
-    } catch {
-      throw new HlError('no_such_user', `No Genesis account for ${email}`, 404)
-    }
-    update.actors = FieldValue.arrayUnion(user.uid)
-  }
-
-  if (patch.removeActor) {
-    update.actors = FieldValue.arrayRemove(patch.removeActor)
+    update.actors = patch.on
+      ? FieldValue.arrayUnion(patch.actorUid)
+      : FieldValue.arrayRemove(patch.actorUid)
   }
 
   // set/merge rather than update, so a flag whose document does not exist yet still works.
@@ -116,12 +110,32 @@ export async function setFlag(
   return flags.find((f) => f.key === key) as FlagState
 }
 
-// Email addresses are resolved on demand for the admin UI, so they are never stored in
-// the world-readable flag document.
-export async function labelActors(uids: string[]): Promise<Record<string, string>> {
-  if (!uids.length) return {}
-  const { users } = await getAuth().getUsers(uids.map((uid) => ({ uid })))
-  return Object.fromEntries(users.map((u) => [u.uid, u.email ?? u.uid]))
+export interface AdminUser {
+  uid: string
+  email: string
+  provider: string
+  createdAt: number
+}
+
+// One page is the admin SDK's maximum. Beyond that the page would need paging, and the
+// truncated flag is there so the UI can say so rather than quietly showing a subset.
+const USER_PAGE = 1000
+
+// Every account, so the admin can toggle a flag per user without knowing an address in
+// advance. Resolved live from Firebase Auth: emails are deliberately not mirrored into
+// the world-readable flag documents.
+export async function listAllUsers(): Promise<{ users: AdminUser[]; truncated: boolean }> {
+  const page = await getAuth().listUsers(USER_PAGE)
+  const users = page.users
+    .map((u) => ({
+      uid: u.uid,
+      email: u.email ?? u.uid,
+      provider: u.providerData[0]?.providerId ?? 'password',
+      createdAt: Date.parse(u.metadata.creationTime) || 0,
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt)
+
+  return { users, truncated: Boolean(page.pageToken) }
 }
 
 // So the admin UI lists every registered flag even before one has been touched.
