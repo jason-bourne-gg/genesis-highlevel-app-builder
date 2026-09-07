@@ -9,9 +9,7 @@ const ALICE = 'uid_alice'
 const BOB = 'uid_bob'
 const gates = (over = {}) => ({ hl_writes: { enabled: false, actors: [], ...over } })
 
-// This mirrors gate() in functions/src/flags/store.ts. The server stays the authority on
-// every call; this copy only decides what the browser renders, so the two must agree or
-// the UI promises something the proxy refuses.
+// This mirrors gate() in functions/src/flags/store.ts.
 describe('gate', () => {
   it('is off when neither gate is open', () => {
     expect(gate(gates(), 'hl_writes', ALICE)).toBe(false)

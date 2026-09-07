@@ -12,9 +12,7 @@ const SHELL = `<!doctype html>
 const wrote = (...paths) => new Set(paths)
 const files = (html) => new Map([['index.html', html]])
 
-// The preview stitches the files together by finding these three tags. A shell missing
-// one renders blank with no error, which is the worst failure available: it looks like
-// the generated app is broken rather than like the generation was rejected.
+// The preview stitches the files together by finding these three tags.
 test('a complete shell passes', () => {
   assert.strictEqual(validateShell(files(SHELL), wrote('index.html')), null)
 })

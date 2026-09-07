@@ -3,10 +3,8 @@ const { fileId } = require('../lib/generate/store.js')
 const fs = require('node:fs')
 const path = require('node:path')
 
-// Two write paths land in this collection — the generation function through the admin
-// SDK, and the browser for manual edits and restores. They derive the document id from
-// the file path independently, so a file must land in the same place whoever writes it.
-// Drift here means an edit silently creating a second document instead of updating one.
+// Two write paths land in this collection — the generation function through the admin SDK, and
+// the browser for manual edits and restores.
 test('the browser and the server derive ids with the same expression', () => {
   const client = fs.readFileSync(
     path.join(__dirname, '../../frontend/src/services/projects.ts'),

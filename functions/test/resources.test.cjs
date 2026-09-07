@@ -29,9 +29,7 @@ const routed = (map) => (url) => {
   return json({}, 404)
 }
 
-// HighLevel's field names vary by endpoint, so responses are normalised into one shape
-// here. The prompt documents that shape exactly, so a mapping slip shows up as blank
-// fields in every generated app rather than as an error.
+// HighLevel's field names vary by endpoint, so responses are normalised into one shape here.
 atest('contacts are normalised, and every field is present', async () => {
   await withRes(
     routed({ '/contacts/': { contacts: [{ id: 'c1', firstName: 'Asha', tags: ['lead', 7] }] } }),

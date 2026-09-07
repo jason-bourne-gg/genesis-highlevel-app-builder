@@ -1,12 +1,6 @@
-// The HighLevel client every generated app gets. We write it, not the model, so the surface
-// stays narrow and the real access token never leaves the server.
-//
-// Writes go through a confirmation dialog defined here rather than in the generated app.
-// The model cannot skip it, because the only way it can reach a write endpoint is to call
-// one of these methods, and each awaits the dialog first. That stops mistakes. It is not a
-// defence against a page that deliberately calls the endpoint itself with the badge sitting
-// in the same document — the server-side field allowlist and the per-badge write budget are
-// what cover that.
+// Ours, not the model's, so the surface stays narrow and the token never leaves the server.
+// The write dialog below is unskippable because these methods are the only route to the
+// endpoint — that covers mistakes, not a page that calls the endpoint itself.
 export const HL_CLIENT_SOURCE = `// Injected by Genesis. Talks to the Genesis proxy, never to HighLevel directly.
 (function () {
   var BASE = '__PREVIEW_BASE__'

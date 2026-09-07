@@ -11,15 +11,8 @@ vi.mock('@/lib/firebase', () => ({
 const { buildPreview } = await import('@/lib/preview')
 import type { ProjectFile } from '@/types'
 
-// Two halves of one agreement, in two packages that never import each other:
-//
-//   functions/src/generate/validate.ts  decides whether a shell is acceptable
-//   frontend/src/lib/preview.ts         stitches the files together by those same tags
-//
-// If they drift, the server saves a generation the browser cannot render, and the
-// preview goes blank with no error anywhere — the worst failure this app has, because it
-// looks like the generated app is broken. The comments in both files say to keep them in
-// step; this is the check that notices when they do not.
+// validate.ts and preview.ts agree on three tags without importing each other. Drift
+// means a saved generation the browser renders blank, with no error anywhere.
 const ROOT = resolve(__dirname, '../..')
 
 // Compiled rather than the .ts source, so the test exercises what actually ships.

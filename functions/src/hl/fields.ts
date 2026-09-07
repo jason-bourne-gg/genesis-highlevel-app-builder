@@ -1,9 +1,7 @@
 import { HlError } from '../errors'
 
-// Field validation for writes, kept separate from the writers so it can be tested without
-// standing up a HighLevel call. Every write body arrives from code an LLM wrote, so
-// "forward it and let HighLevel validate" is not a position worth defending — an
-// unexpected field on a CRM record is a silent data change.
+// Write bodies come from code an LLM wrote, so fields are allowlisted rather than
+// forwarded: an unexpected field on a CRM record is a silent data change.
 export type Body = Record<string, unknown>
 
 export const text = (v: unknown, max = 500): string | undefined => {

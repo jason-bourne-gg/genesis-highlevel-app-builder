@@ -1,6 +1,5 @@
-// clientIp feeds the audit log, not the rate limit — the limit is keyed on the
-// authenticated uid, precisely because X-Forwarded-For is attacker-influenced. These cases
-// pin down that a forged leading hop never becomes the logged address.
+// clientIp feeds the audit log, not the rate limit — the limit is keyed on the authenticated
+// uid, precisely because X-Forwarded-For is attacker-influenced.
 const assert = require('node:assert')
 const { clientIp } = require('../lib/admin/unlock.js')
 

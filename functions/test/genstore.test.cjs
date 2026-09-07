@@ -14,9 +14,8 @@ const msg = (role, content, createdAt, over = {}) => ({
   role, content, createdAt, status: 'complete', ...over,
 })
 
-// The client sends a project id in the body, and nothing stops it sending someone
-// else's — so ownership is re-checked here even though rules already cover the
-// collections the browser touches directly.
+// The client sends a project id in the body, and nothing stops it sending someone else's — so
+// ownership is re-checked here even though rules already cover the collections the browser
 atest('a project you do not own is a 403', async () => {
   await withStore(project, async ({ store }) => {
     await assert.rejects(store.loadContext(OTHER, P), (e) => {

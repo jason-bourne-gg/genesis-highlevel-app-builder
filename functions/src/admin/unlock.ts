@@ -1,19 +1,15 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import {
   getFirestore,
   type DocumentReference,
   type DocumentSnapshot,
 } from 'firebase-admin/firestore'
-import { timingSafeEqual } from 'node:crypto'
 import { logger } from 'firebase-functions/v2'
 import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
 import { config } from '../config'
 
-// Unlocking is not signing in. The caller keeps their own session; the credential only
-// buys a short-lived pass for the flag admin, held in memory by the page that asked for
-// it. Same shape as the preview badge: an opaque random string looked up server-side, so
-// it is revocable and there is no signing key to manage.
+// Opaque and looked up server-side, like the preview badge, so it stays revocable.
 const TTL_MS = 30 * 60 * 1000
 
 export interface AdminGrant {
@@ -43,8 +39,7 @@ export async function claimAdminToken(token: string): Promise<AdminGrant | null>
   return grant
 }
 
-// Minted per unlock and only removed when claimed after expiry, so the collection would
-// otherwise grow without bound. Single-field range query, no index needed.
+// Minted per unlock, so without this the collection grows without bound.
 export async function sweepAdminTokens(): Promise<void> {
   const stale = await getFirestore()
     .collection('adminTokens')
@@ -63,20 +58,10 @@ function matches(given: string, expected: string): boolean {
 }
 
 const WINDOW_MS = 15 * 60 * 1000
-// Per signed-in account. Unlocking requires authentication, so this is keyed on something
-// the caller cannot change without creating a new account.
 const PER_CALLER = 10
-// Shared backstop, so creating accounts to farm fresh buckets is bounded too. The cost is
-// that a determined attacker can lock the flag admin for a window, which is the cheaper
-// failure of the two.
+// Bounds creating accounts to farm fresh per-account budgets.
 const GLOBAL = 60
 
-// For the log line only. X-Forwarded-For is a list the caller can prepend to, and how many
-// hops the infrastructure appends depends on the ingress path — so it is not something to
-// key a rate limit on. The limit uses the authenticated uid instead, which cannot be forged.
-// The last entry is the closest thing to a real address here.
-// Exported so the comparison is testable without standing up an express request. The
-// username is compared case-insensitively; the password never is.
 export function credentialMatches(username: string, password: string): boolean {
   const { rootUsername, rootPassword } = config
   if (!rootUsername || !rootPassword) return false
@@ -91,25 +76,16 @@ export function clientIp(xff: string | undefined, fallback: string | undefined):
   return hops.length ? hops[hops.length - 1] : (fallback ?? 'unknown')
 }
 
-// The only password endpoint in the project, so it gets the only rate limit. Counted in
-// Firestore rather than in memory, because Cloud Run runs several instances and an
-// in-memory counter would hand an attacker one bucket per container.
 interface Bucket {
   count: number
   startedAt: number
 }
 
-// The only password endpoint in the project, so it gets the only rate limit. Counted in
-// Firestore rather than in memory, because Cloud Run runs several instances and an
-// in-memory counter would hand an attacker one bucket per container.
-//
-// getAll rather than two awaited gets: a Firestore transaction reads every document it
-// needs in one call, and issuing concurrent tx.get() calls throws.
+// In Firestore, not in memory: Cloud Run would give an attacker one bucket per instance.
 export async function throttle(uid: string): Promise<boolean> {
   const db = getFirestore()
   const perCaller = db.doc(`adminUnlockAttempts/${encodeURIComponent(uid)}`)
-  // Not "__all__": Firestore reserves document ids matching __.*__ and rejects them at
-  // write time, which the client-side path validation does not catch.
+  // Not "__all__": Firestore reserves __.*__ ids, and only rejects them at write time.
   const global = db.doc('adminUnlockAttempts/_global')
 
   return db.runTransaction(async (tx) => {
@@ -131,19 +107,14 @@ export async function throttle(uid: string): Promise<boolean> {
       return true
     }
 
-    // Both are spent before either result is returned, so a rejected attempt still counts
-    // against each bucket rather than being free once one limit is already hit.
+    // Both spend before either answer is returned, so a refused attempt still counts.
     const callerOk = spend(callerSnap, perCaller, PER_CALLER)
     const allOk = spend(allSnap, global, GLOBAL)
     return callerOk && allOk
   })
 }
 
-// Exchanges the root credential in functions/.env for a short-lived pass to the flag
-// admin. The caller must already be signed in, so an unlock is always attributable, and
-// their own session is untouched — this is closer to sudo than to a second login.
-//
-// The credential is compared here rather than anywhere in the browser bundle.
+// Sudo, not a second login: the caller keeps their session and the unlock is attributable.
 export const adminUnlock = onRequest({ cors: true }, async (req, res) => {
   if (req.method !== 'POST') return void res.status(405).json({ error: 'Use POST' })
 
@@ -171,8 +142,7 @@ export const adminUnlock = onRequest({ cors: true }, async (req, res) => {
       })
     }
   } catch (e) {
-    // Fail closed. A credential gate that opens when its rate limit is unavailable is not
-    // a gate, and the flag admin being briefly unreachable is the cheaper failure.
+    // Fail closed: a gate that opens when its rate limit is down is not a gate.
     logger.error('admin.unlock.throttle_failed', { ip, message: (e as Error).message })
     return void res.status(503).json({
       error: 'Could not check the rate limit. Try again shortly.',
