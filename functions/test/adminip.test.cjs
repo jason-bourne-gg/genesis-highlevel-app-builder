@@ -1,8 +1,8 @@
-// The rate limit is only as good as the address it counts against, and X-Forwarded-For is
-// attacker-influenced: entries a client sends arrive intact with the real one appended.
-// Reading the wrong end of that list makes the limit free to bypass.
+// clientIp feeds the audit log, not the rate limit — the limit is keyed on the
+// authenticated uid, precisely because X-Forwarded-For is attacker-influenced. These cases
+// pin down that a forged leading hop never becomes the logged address.
 const assert = require('node:assert')
-const { clientIp } = require('../lib/root/login.js')
+const { clientIp } = require('../lib/admin/unlock.js')
 
 const cases = [
   // [xff, req.ip, expected, why]

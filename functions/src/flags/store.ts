@@ -1,18 +1,15 @@
 import { getAuth } from 'firebase-admin/auth'
-import { getFirestore } from 'firebase-admin/firestore'
+import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import { config } from '../config'
 import { HlError } from '../errors'
 import { FLAG_DEFS, findDef, type FlagDef } from './defs'
 
-export interface FlagActor {
-  uid: string
-  // Stored alongside the uid purely so the admin UI can show something readable.
-  email: string
-}
-
 export interface FlagDoc {
   enabled: boolean
-  actors: FlagActor[]
+  // Uids only. This document is world-readable so the sign-in page can resolve a flag
+  // before anyone is signed in, and an email address is a real identifier — the admin UI
+  // resolves labels through flagsAdmin instead.
+  actors: string[]
   updatedAt: number
   updatedBy: string
 }
@@ -32,7 +29,7 @@ export async function readFlags(): Promise<FlagState[]> {
     return {
       ...def,
       enabled: typeof doc.enabled === 'boolean' ? doc.enabled : def.default,
-      actors: Array.isArray(doc.actors) ? doc.actors : [],
+      actors: Array.isArray(doc.actors) ? doc.actors.filter((a): a is string => typeof a === 'string') : [],
       updatedAt: Number(doc.updatedAt ?? 0),
       updatedBy: String(doc.updatedBy ?? ''),
     }
@@ -45,7 +42,7 @@ export async function readFlags(): Promise<FlagState[]> {
 export function gate(flag: FlagState, uid: string | null): boolean {
   if (flag.enabled) return true
   if (!uid || flag.globalOnly) return false
-  return flag.actors.some((a) => a.uid === uid)
+  return flag.actors.includes(uid)
 }
 
 export async function resolveFlags(uid: string | null): Promise<Record<string, boolean>> {
@@ -59,19 +56,11 @@ export async function flagOn(key: string, uid: string | null): Promise<boolean> 
   return flag ? gate(flag, uid) : false
 }
 
-// Root is configuration, never data: a row in Firestore that grants root would be a row
-// worth attacking. Three sources, most trustworthy first — the signed claim from
-// rootLogin, an explicit uid list, then a verified email. An unverified address is
-// refused because it is self-asserted at signup, so an allowlisted address nobody has
-// registered yet is an account anyone could claim.
-export function isRoot(
-  uid: string,
-  email?: string,
-  emailVerified = false,
-  claim = false,
-): boolean {
-  // A signed custom claim, set by rootLogin against the credential in functions/.env.
-  if (claim) return true
+// Standing root, from configuration rather than data: a row in Firestore that granted
+// root would be a row worth attacking. An unverified email is refused because it is
+// self-asserted at signup, so an allowlisted address nobody has registered yet is an
+// account anyone could claim. The other way in is an unlock pass — see admin/unlock.ts.
+export function isRoot(uid: string, email?: string, emailVerified = false): boolean {
   if (config.rootUids.includes(uid)) return true
   if (!email || !emailVerified) return false
   return config.rootEmails.includes(email.toLowerCase())
@@ -83,6 +72,9 @@ export interface FlagPatch {
   removeActor?: string
 }
 
+// Written as field-level updates rather than a read-modify-write of the whole document.
+// Two roots adding actors at the same moment would otherwise both read the same array and
+// the second write would silently drop the first addition.
 export async function setFlag(
   key: string,
   patch: FlagPatch,
@@ -91,13 +83,9 @@ export async function setFlag(
   const def = findDef(key)
   if (!def) throw new HlError('unknown_flag', `Unknown flag ${key}`, 400)
 
-  const flags = await readFlags()
-  const current = flags.find((f) => f.key === key) as FlagState
+  const update: Record<string, unknown> = { updatedAt: Date.now(), updatedBy: actorLabel }
 
-  let enabled = current.enabled
-  let actors = [...current.actors]
-
-  if (typeof patch.enabled === 'boolean') enabled = patch.enabled
+  if (typeof patch.enabled === 'boolean') update.enabled = patch.enabled
 
   if (patch.addActor) {
     if (def.globalOnly) {
@@ -114,18 +102,26 @@ export async function setFlag(
     } catch {
       throw new HlError('no_such_user', `No Genesis account for ${email}`, 404)
     }
-    if (!actors.some((a) => a.uid === user.uid)) {
-      actors.push({ uid: user.uid, email: user.email ?? email })
-    }
+    update.actors = FieldValue.arrayUnion(user.uid)
   }
 
   if (patch.removeActor) {
-    actors = actors.filter((a) => a.uid !== patch.removeActor)
+    update.actors = FieldValue.arrayRemove(patch.removeActor)
   }
 
-  const doc: FlagDoc = { enabled, actors, updatedAt: Date.now(), updatedBy: actorLabel }
-  await col().doc(key).set(doc)
-  return { ...def, ...doc }
+  // set/merge rather than update, so a flag whose document does not exist yet still works.
+  await col().doc(key).set(update, { merge: true })
+
+  const flags = await readFlags()
+  return flags.find((f) => f.key === key) as FlagState
+}
+
+// Email addresses are resolved on demand for the admin UI, so they are never stored in
+// the world-readable flag document.
+export async function labelActors(uids: string[]): Promise<Record<string, string>> {
+  if (!uids.length) return {}
+  const { users } = await getAuth().getUsers(uids.map((uid) => ({ uid })))
+  return Object.fromEntries(users.map((u) => [u.uid, u.email ?? u.uid]))
 }
 
 // So the admin UI lists every registered flag even before one has been touched.

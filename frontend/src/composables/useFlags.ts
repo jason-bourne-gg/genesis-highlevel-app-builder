@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import * as flags from '@/services/flags'
 import { useAuth } from './useAuth'
 
@@ -15,6 +15,8 @@ flags.watchFlagGates((next) => {
 const { user } = useAuth()
 
 export function useFlags() {
+  // A computed off the auth ref, so signing in or out re-resolves every actor-targeted
+  // flag with no extra wiring.
   const uid = computed(() => user.value?.id ?? null)
 
   const on = (key: string) => computed(() => flags.gate(gates.value, key, uid.value))
@@ -34,7 +36,3 @@ export function useFlags() {
 export function useFlagGates() {
   return { gates, loaded }
 }
-
-// Cleared and re-resolved automatically: `uid` is a computed off the auth ref, so
-// signing in or out re-evaluates every actor-targeted flag with no extra wiring.
-watch(user, () => {})

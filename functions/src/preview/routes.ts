@@ -46,15 +46,19 @@ export const hlPreview = onRequest(async (req, res) => {
     if (Object.hasOwn(writers, name)) {
       if (req.method !== 'POST') return void res.status(405).json({ error: 'Writes use POST' })
 
-      // Spends one from the badge's budget as part of claiming it.
-      const grant = await claimPreviewWrite(token)
-      if (!(await flagOn('hl_writes', grant.uid))) {
+      // Resolve the badge first, then check the flag, and only spend from the budget once
+      // the request is one we would actually perform. Spending first meant 25 rejected
+      // calls — a disabled flag, or a generated app retrying a validation error — left the
+      // render with no allowance for the writes that were permitted.
+      const identify = await claimPreviewToken(token)
+      if (!(await flagOn('hl_writes', identify.uid))) {
         return void res.status(403).json({
           error: 'HighLevel writes are turned off for this account.',
           code: 'writes_disabled',
         })
       }
 
+      const grant = await claimPreviewWrite(token)
       const body = (req.body ?? {}) as Record<string, unknown>
       const result = await writers[name](grant.uid, body)
       auditWrite(name, grant.uid, body, `preview:${grant.projectId}`)

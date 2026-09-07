@@ -39,10 +39,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Rate-limit counters for the root credential endpoint. Written by the function with
-    // the admin SDK; a client that could read these would learn which addresses are being
-    // tried, and one that could write them could clear its own limit.
-    match /rootLoginAttempts/{ip} {
+    // Both are bearer credentials or the counters protecting one. A client that could
+    // read a pass could administer flags; one that could write the counters could clear
+    // its own rate limit.
+    match /adminTokens/{token} {
+      allow read, write: if false;
+    }
+
+    match /adminUnlockAttempts/{ip} {
       allow read, write: if false;
     }
 

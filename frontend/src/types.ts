@@ -1,9 +1,6 @@
 export interface User {
   id: string
   email: string
-  // From a signed custom claim on the ID token, set by the rootLogin function. Gates the
-  // feature-flag admin in the UI; the server checks the same claim again on every call.
-  root: boolean
 }
 
 export interface Project {
@@ -94,11 +91,6 @@ export type StreamEvent =
   | { type: 'done' }
   | { type: 'error'; message: string }
 
-export interface FlagActor {
-  uid: string
-  email: string
-}
-
 export interface FlagState {
   key: string
   label: string
@@ -107,7 +99,10 @@ export interface FlagState {
   globalOnly?: boolean
   default: boolean
   enabled: boolean
-  actors: FlagActor[]
+  // Uids. The flag document is world-readable so the sign-in page can resolve a flag
+  // before anyone is signed in, so email addresses are resolved separately by flagsAdmin
+  // rather than stored in it.
+  actors: string[]
   updatedAt: number
   updatedBy: string
 }

@@ -237,7 +237,9 @@ export function systemPrompt(o: PromptOptions): string {
       ? NO_WRITES
       : ''
 
-  return HEAD + apiSection(o) + REJECTIONS + writeSection + TAIL
+  // The baseline block already ends with a blank line; the composed one does not.
+  const gap = o.writes || o.extendedReads ? '\n' : ''
+  return HEAD + apiSection(o) + gap + REJECTIONS + writeSection + TAIL
 }
 
 // The all-flags-off surface, which is the original prompt unchanged.
