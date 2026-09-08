@@ -62,7 +62,7 @@ description edited from the dashboard; deleting one hides it rather than removin
 | Feature flag admin | https://genesysbe-cbd7e.web.app/admin/flags |
 | Cloud Functions base | `https://us-central1-genesysbe-cbd7e.cloudfunctions.net` |
 | `generate` (direct Cloud Run URL) | `https://generate-ykls45eqcq-uc.a.run.app` |
-| Loom walkthrough | **TODO** |
+| Loom walkthrough | https://www.loom.com/share/7af776bf596c4a14824270543d8a56dd |
 
 Under the functions base: `oauthStart`, `oauthCallback`, `hlDisconnect`,
 `previewToken`, `flagsAdmin`, `adminUnlock`, and the two proxies.
