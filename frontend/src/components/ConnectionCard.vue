@@ -1,17 +1,34 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { LoaderCircleIcon, PlugZapIcon, TriangleAlertIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useHighLevel } from '@/composables/useHighLevel'
 
-const { connection, connected, connecting, lost, connect, disconnect } = useHighLevel()
+const { connection, connected, connecting, lost, listenerFailed, connect, disconnect } =
+  useHighLevel()
+
+const unlinking = ref(false)
 
 async function link() {
   try {
     await connect()
   } catch (e) {
     toast.error(`Could not start the HighLevel connection: ${(e as Error).message}`)
+  }
+}
+
+// A failure here used to be invisible: the call was fired and nothing reported the result.
+async function unlink() {
+  unlinking.value = true
+  try {
+    await disconnect()
+    toast.success('Disconnected from HighLevel')
+  } catch (e) {
+    toast.error(`Could not disconnect: ${(e as Error).message}`)
+  } finally {
+    unlinking.value = false
   }
 }
 </script>
@@ -63,11 +80,17 @@ async function link() {
           </template>
           <template v-else-if="connecting">Redirecting to HighLevel&hellip;</template>
           <template v-else-if="lost">Connection lost — the token needs refreshing</template>
+          <template v-else-if="listenerFailed">
+            Lost contact with the database — this may be out of date. Reload the page.
+          </template>
           <template v-else>Not connected. Link a location to give your apps real data.</template>
         </p>
       </div>
 
-      <Button v-if="connected" variant="outline" @click="disconnect">Disconnect</Button>
+      <Button v-if="connected" variant="outline" :disabled="unlinking" @click="unlink">
+        <LoaderCircleIcon v-if="unlinking" class="animate-spin" />
+        Disconnect
+      </Button>
       <Button v-else :disabled="connecting" @click="link">
         <LoaderCircleIcon v-if="connecting" class="animate-spin" />
         {{ lost ? 'Reconnect' : 'Connect HighLevel' }}

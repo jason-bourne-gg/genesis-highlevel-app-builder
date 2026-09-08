@@ -5,6 +5,7 @@ import { ApiError } from '@/services/api'
 import { useAuth } from './useAuth'
 
 const connection = ref<Connection>({ status: 'disconnected' })
+const listenerFailed = ref(false)
 let stop: (() => void) | null = null
 
 const { user } = useAuth()
@@ -15,11 +16,22 @@ watch(
     stop = null
     if (!next) {
       connection.value = { status: 'disconnected' }
+      listenerFailed.value = false
       return
     }
-    stop = hl.watchConnection(next.id, (c) => {
-      connection.value = c
-    })
+    listenerFailed.value = false
+    stop = hl.watchConnection(
+      next.id,
+      (c) => {
+        connection.value = c
+      },
+      (e) => {
+        // Leave the last known state alone: a dropped listener is not evidence the
+        // connection went away, and flipping to disconnected would be a lie.
+        console.error('HighLevel connection listener failed', e)
+        listenerFailed.value = true
+      },
+    )
   },
   { immediate: true },
 )
@@ -42,8 +54,12 @@ export function useHighLevel() {
     }
   }
 
+  // Reflects its own result rather than waiting to be told. The listener is still the
+  // source of truth, but an action that succeeded should not look like it did nothing if
+  // that listener is slow or has dropped.
   async function disconnect() {
     await hl.disconnect()
+    connection.value = { status: 'disconnected' }
   }
 
   // A 401 from the proxy means HighLevel rejected the token, so the connection is
@@ -70,6 +86,7 @@ export function useHighLevel() {
     connected,
     connecting,
     lost,
+    listenerFailed,
     connect,
     disconnect,
     dropConnection,
