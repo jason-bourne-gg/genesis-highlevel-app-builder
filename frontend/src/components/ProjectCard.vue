@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import { Trash2Icon } from '@lucide/vue'
+import { PencilIcon, Trash2Icon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { Project } from '@/types'
 import { relative } from '@/lib/time'
 
 defineProps<{ project: Project }>()
-defineEmits<{ remove: [id: string] }>()
+defineEmits<{ edit: [id: string]; remove: [id: string] }>()
 </script>
 
 <template>
@@ -27,15 +27,26 @@ defineEmits<{ remove: [id: string] }>()
     </RouterLink>
     <div class="mt-4 flex items-center justify-between px-5">
       <span class="text-muted-foreground text-xs">Edited {{ relative(project.updatedAt) }}</span>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="text-muted-foreground hover:text-destructive relative opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-        aria-label="Delete project"
-        @click="$emit('remove', project.id)"
-      >
-        <Trash2Icon />
-      </Button>
+      <div class="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="text-muted-foreground hover:text-primary relative"
+          aria-label="Edit project"
+          @click="$emit('edit', project.id)"
+        >
+          <PencilIcon />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="text-muted-foreground hover:text-destructive relative"
+          aria-label="Delete project"
+          @click="$emit('remove', project.id)"
+        >
+          <Trash2Icon />
+        </Button>
+      </div>
     </div>
   </Card>
 </template>

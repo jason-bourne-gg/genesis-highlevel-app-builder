@@ -1,13 +1,44 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const updateDoc = vi.fn()
 
 vi.mock('@/lib/firebase', () => ({ functionsBase: 'https://f.test', auth: {}, db: {} }))
 vi.mock('firebase/firestore', () => ({
-  addDoc: vi.fn(), setDoc: vi.fn(), collection: () => ({}), doc: () => ({}),
+  addDoc: vi.fn(), setDoc: vi.fn(), collection: () => ({}), doc: (_c: unknown, id: string) => ({ id }),
   getDoc: vi.fn(), onSnapshot: () => () => {}, orderBy: vi.fn(), query: vi.fn(),
-  updateDoc: vi.fn(), where: vi.fn(), writeBatch: vi.fn(),
+  updateDoc, where: vi.fn(), writeBatch: vi.fn(),
 }))
 
-const { fileId, sortFiles } = await import('@/services/projects')
+const { fileId, sortFiles, updateProject, deleteProject } = await import('@/services/projects')
+
+beforeEach(() => updateDoc.mockClear())
+
+describe('updateProject', () => {
+  it('writes the name and description and touches updatedAt', async () => {
+    await updateProject('p1', { name: 'Recall Chaser', description: 'texts patients' })
+    const [, fields] = updateDoc.mock.calls[0]
+    expect(fields.name).toBe('Recall Chaser')
+    expect(fields.description).toBe('texts patients')
+    expect(fields.updatedAt).toBeGreaterThan(0)
+  })
+
+  // The rules pin ownerUid on update, so including it would fail the write outright.
+  it('never sends ownerUid or locationId', async () => {
+    await updateProject('p1', { name: 'n', description: 'd' })
+    const [, fields] = updateDoc.mock.calls[0]
+    expect(Object.keys(fields).sort()).toEqual(['description', 'name', 'updatedAt'])
+  })
+})
+
+describe('deleteProject', () => {
+  // Soft delete: a hard one would have to walk every subcollection.
+  it('sets deletedAt rather than removing anything', async () => {
+    await deleteProject('p1')
+    const [, fields] = updateDoc.mock.calls[0]
+    expect(Object.keys(fields)).toEqual(['deletedAt'])
+    expect(fields.deletedAt).toBeGreaterThan(0)
+  })
+})
 
 describe('fileId', () => {
   // Must match fileId() in functions/src/generate/store.ts: the generation function and the
