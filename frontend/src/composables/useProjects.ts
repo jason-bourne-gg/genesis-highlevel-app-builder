@@ -41,8 +41,11 @@ export function useProjects() {
     return store.createProject(user.value.id, name, description, connection.value.locationId ?? '')
   }
 
+  const update = (id: string, name: string, description: string) =>
+    store.updateProject(id, { name, description })
+
   // No local splice: the subscription reports the removal.
   const remove = (id: string) => store.deleteProject(id)
 
-  return { projects, loading, create, remove }
+  return { projects, loading, create, update, remove }
 }

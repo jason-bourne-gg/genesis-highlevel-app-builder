@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { LoaderCircleIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,21 +13,24 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import type { Project } from '@/types'
 
 const open = defineModel<boolean>('open', { required: true })
-const emit = defineEmits<{ create: [name: string, description: string] }>()
+const emit = defineEmits<{ submit: [name: string, description: string] }>()
 
-const props = defineProps<{ pending: boolean }>()
+// One dialog for both, so the name rules cannot drift between creating and editing.
+const props = defineProps<{ pending: boolean; project?: Project | null }>()
 
 const name = ref('')
 const description = ref('')
 const error = ref('')
 
+const editing = computed(() => Boolean(props.project))
+
 watch(open, (isOpen) => {
-  if (isOpen) return
-  name.value = ''
-  description.value = ''
   error.value = ''
+  name.value = isOpen ? (props.project?.name ?? '') : ''
+  description.value = isOpen ? (props.project?.description ?? '') : ''
 })
 
 const MAX_NAME = 60
@@ -43,7 +46,7 @@ function submit() {
     return
   }
   error.value = ''
-  emit('create', trimmed, description.value.trim())
+  emit('submit', trimmed, description.value.trim())
 }
 </script>
 
@@ -52,9 +55,13 @@ function submit() {
     <DialogContent>
       <form class="space-y-6" novalidate @submit.prevent="submit">
         <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
+          <DialogTitle>{{ editing ? 'Edit project' : 'New project' }}</DialogTitle>
           <DialogDescription>
-            Name it and say roughly what it should do. You can refine it in chat afterwards.
+            {{
+              editing
+                ? 'Renaming changes nothing the model has already written.'
+                : 'Name it and say roughly what it should do. You can refine it in chat afterwards.'
+            }}
           </DialogDescription>
         </DialogHeader>
 
@@ -79,7 +86,7 @@ function submit() {
           <Button type="button" variant="ghost" @click="open = false">Cancel</Button>
           <Button type="submit" :disabled="props.pending">
             <LoaderCircleIcon v-if="props.pending" class="animate-spin" />
-            Create project
+            {{ editing ? 'Save changes' : 'Create project' }}
           </Button>
         </DialogFooter>
       </form>

@@ -51,7 +51,8 @@ flowchart TD
 ```
 
 Every generation saves a snapshot, a copy of all the project files at that moment,
-so any earlier version can be brought back.
+so any earlier version can be brought back. Projects can be renamed and their
+description edited from the dashboard; deleting one hides it rather than removing it.
 
 ## Live URLs
 

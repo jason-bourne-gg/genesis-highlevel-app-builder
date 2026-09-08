@@ -89,6 +89,14 @@ export async function createProject(
   return { id: ref.id, name, description, locationId, createdAt: now, updatedAt: now }
 }
 
+// ownerUid is deliberately not touched — the rules pin it, so including it would fail.
+export function updateProject(
+  id: string,
+  fields: { name: string; description: string },
+): Promise<void> {
+  return updateDoc(doc(projects, id), { ...fields, updatedAt: Date.now() })
+}
+
 // Soft delete: a hard delete would have to walk subcollections, and a mis-click costs history.
 export function deleteProject(id: string): Promise<void> {
   return updateDoc(doc(projects, id), { deletedAt: Date.now() })

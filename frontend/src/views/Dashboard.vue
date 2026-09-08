@@ -6,7 +6,7 @@ import { toast } from 'vue-sonner'
 import type { Project } from '@/types'
 import ConnectionCard from '@/components/ConnectionCard.vue'
 import DevMenu from '@/components/DevMenu.vue'
-import NewProjectDialog from '@/components/NewProjectDialog.vue'
+import ProjectDialog from '@/components/ProjectDialog.vue'
 import ProjectCard from '@/components/ProjectCard.vue'
 import UserMenu from '@/components/UserMenu.vue'
 import {
@@ -25,14 +25,26 @@ import { useProjects } from '@/composables/useProjects'
 import { readOAuthResult } from '@/composables/useOAuthResult'
 
 const router = useRouter()
-const { projects, loading, create, remove } = useProjects()
+const { projects, loading, create, update, remove } = useProjects()
 const { enabled: devMode } = useDev()
 
 readOAuthResult()
 
 const dialogOpen = ref(false)
-const creating = ref(false)
+const saving = ref(false)
+// Set means the dialog is editing that project; null means it is creating one.
+const editing = ref<Project | null>(null)
 const pendingDelete = ref<Project | null>(null)
+
+function openNew() {
+  editing.value = null
+  dialogOpen.value = true
+}
+
+function openEdit(id: string) {
+  editing.value = projects.value.find((p) => p.id === id) ?? null
+  if (editing.value) dialogOpen.value = true
+}
 
 const deleteOpen = computed({
   get: () => pendingDelete.value !== null,
@@ -41,14 +53,23 @@ const deleteOpen = computed({
   },
 })
 
-async function onCreate(name: string, description: string) {
-  creating.value = true
+async function onSubmit(name: string, description: string) {
+  saving.value = true
   try {
+    const target = editing.value
+    if (target) {
+      await update(target.id, name, description)
+      dialogOpen.value = false
+      toast.success(`Saved ${name}`)
+      return
+    }
     const project = await create(name, description)
     dialogOpen.value = false
     router.push(`/project/${project.id}`)
+  } catch (e) {
+    toast.error((e as Error).message)
   } finally {
-    creating.value = false
+    saving.value = false
   }
 }
 
@@ -94,7 +115,7 @@ async function confirmDelete() {
           Small internal apps built straight onto your HighLevel location — contacts,
           conversations and calendars, no glue code.
         </p>
-        <Button class="mt-6" @click="dialogOpen = true">
+        <Button class="mt-6" @click="openNew">
           <PlusIcon />
           New project
         </Button>
@@ -105,7 +126,7 @@ async function confirmDelete() {
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold tracking-tight">Projects</h2>
-          <Button variant="outline" @click="dialogOpen = true">
+          <Button variant="outline" @click="openNew">
             <PlusIcon />
             New project
           </Button>
@@ -134,13 +155,19 @@ async function confirmDelete() {
             v-for="project in projects"
             :key="project.id"
             :project="project"
+            @edit="openEdit"
             @remove="askDelete"
           />
         </div>
       </section>
     </main>
 
-    <NewProjectDialog v-model:open="dialogOpen" :pending="creating" @create="onCreate" />
+    <ProjectDialog
+      v-model:open="dialogOpen"
+      :pending="saving"
+      :project="editing"
+      @submit="onSubmit"
+    />
 
     <AlertDialog v-model:open="deleteOpen">
       <AlertDialogContent>
