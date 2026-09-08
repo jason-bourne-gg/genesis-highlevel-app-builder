@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { PlusIcon, SparklesIcon } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -34,6 +34,11 @@ const dialogOpen = ref(false)
 const saving = ref(false)
 // Set means the dialog is editing that project; null means it is creating one.
 const editing = ref<Project | null>(null)
+
+// Deliberately two refs. Deriving the open state from pendingDelete meant the dialog
+// closing cleared the project — and AlertDialogAction closes on click, before the click
+// handler runs, so confirming read null and silently did nothing.
+const deleteOpen = ref(false)
 const pendingDelete = ref<Project | null>(null)
 
 function openNew() {
@@ -45,13 +50,6 @@ function openEdit(id: string) {
   editing.value = projects.value.find((p) => p.id === id) ?? null
   if (editing.value) dialogOpen.value = true
 }
-
-const deleteOpen = computed({
-  get: () => pendingDelete.value !== null,
-  set: (value: boolean) => {
-    if (!value) pendingDelete.value = null
-  },
-})
 
 async function onSubmit(name: string, description: string) {
   saving.value = true
@@ -75,14 +73,21 @@ async function onSubmit(name: string, description: string) {
 
 function askDelete(id: string) {
   pendingDelete.value = projects.value.find((p) => p.id === id) ?? null
+  if (pendingDelete.value) deleteOpen.value = true
 }
 
 async function confirmDelete() {
   const project = pendingDelete.value
   if (!project) return
-  pendingDelete.value = null
-  await remove(project.id)
-  toast.success(`Deleted ${project.name}`)
+  deleteOpen.value = false
+  try {
+    await remove(project.id)
+    toast.success(`Deleted ${project.name}`)
+  } catch (e) {
+    toast.error(`Could not delete ${project.name}: ${(e as Error).message}`)
+  } finally {
+    pendingDelete.value = null
+  }
 }
 </script>
 
