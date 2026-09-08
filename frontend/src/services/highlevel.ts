@@ -10,20 +10,30 @@ interface UserDoc {
 }
 
 // No polling: the OAuth callback writes this document and the browser is already listening.
-export function watchConnection(uid: string, onChange: (c: Connection) => void): () => void {
-  return onSnapshot(doc(db, 'users', uid), (snap) => {
-    const data = (snap.data() ?? {}) as UserDoc
-    onChange(
-      data.hlLocationId
-        ? {
-            status: 'connected',
-            locationId: data.hlLocationId,
-            locationName: data.hlLocationName,
-            connectedAt: data.hlConnectedAt,
-          }
-        : { status: 'disconnected' },
-    )
-  })
+export function watchConnection(
+  uid: string,
+  onChange: (c: Connection) => void,
+  onError?: (e: Error) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'users', uid),
+    (snap) => {
+      const data = (snap.data() ?? {}) as UserDoc
+      onChange(
+        data.hlLocationId
+          ? {
+              status: 'connected',
+              locationId: data.hlLocationId,
+              locationName: data.hlLocationName,
+              connectedAt: data.hlConnectedAt,
+            }
+          : { status: 'disconnected' },
+      )
+    },
+    // Without this a failed listener is silent, and the connection state simply stops
+    // updating — which looks like the buttons not working.
+    (e) => onError?.(e),
+  )
 }
 
 export async function startOAuth(): Promise<void> {
