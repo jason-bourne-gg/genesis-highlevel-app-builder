@@ -29,20 +29,33 @@ jobs:
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+          cache-dependency-path: |
+            frontend/package-lock.json
+            functions/package-lock.json
+
+      # test/contract.spec.ts imports the COMPILED functions output
+      # (functions/lib/generate/validate.js) on purpose, so that the contract is
+      # checked against what actually ships. That means functions must be built
+      # before the frontend suite can run.
+      - name: Build cloud functions (contract-test dependency)
+        run: npm ci && npm run build
+        working-directory: functions
+
+      - name: Install
+        run: npm ci
+        working-directory: frontend
       - name: Type-check
         run: npm run typecheck
+        working-directory: frontend
       - name: Unit tests
         run: npm test
+        working-directory: frontend
       - name: Production build
         run: npm run build
+        working-directory: frontend
