@@ -1,5 +1,7 @@
 # Genesis — AI-Powered HighLevel App Builder
 
+[![CI](https://github.com/jason-bourne-gg/genesis-highlevel-app-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/jason-bourne-gg/genesis-highlevel-app-builder/actions/workflows/ci.yml)
+
 Genesis builds small business apps for you by writing the code itself.
 
 You sign in, connect your HighLevel account, and type what you want in plain
