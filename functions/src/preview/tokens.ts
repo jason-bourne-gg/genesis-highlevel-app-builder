@@ -18,6 +18,11 @@ export interface PreviewGrant {
 // runaway loop. Per badge, and a badge only lasts one render.
 const WRITE_BUDGET = 25
 
+// Arrives in a request header, so it is caller-controlled. Firestore reads a "/" as
+// another path segment, and a deeper path is a different document under different rules.
+// 32 bytes of base64url is 43 characters; anything else was never minted here.
+const SHAPE = /^[A-Za-z0-9_-]{43}$/
+
 const ref = (token: string) => getFirestore().doc(`previewTokens/${token}`)
 
 // Opaque random string looked up server-side, not a signed blob: revocable and simpler.
@@ -33,6 +38,7 @@ export async function mintPreviewToken(
 
 export async function claimPreviewToken(token: string): Promise<PreviewGrant> {
   if (!token) throw new HlError('no_preview_token', 'Missing preview token', 401)
+  if (!SHAPE.test(token)) throw new HlError('bad_preview_token', 'Malformed preview token', 401)
 
   const snap = await ref(token).get()
   if (!snap.exists) throw new HlError('bad_preview_token', 'Unknown preview token', 401)
@@ -68,6 +74,7 @@ export async function sweepExpired(): Promise<void> {
 // slot in the budget.
 export async function claimPreviewWrite(token: string): Promise<PreviewGrant> {
   if (!token) throw new HlError('no_preview_token', 'Missing preview token', 401)
+  if (!SHAPE.test(token)) throw new HlError('bad_preview_token', 'Malformed preview token', 401)
 
   const doc = ref(token)
   return getFirestore().runTransaction(async (tx) => {

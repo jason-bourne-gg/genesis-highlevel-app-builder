@@ -36,6 +36,13 @@ export function watchConnection(
   )
 }
 
+// The callback parks the exchanged tokens rather than committing them, and hands the
+// browser a one-time code. Sending it back with this session's ID token is what proves the
+// browser that finished the flow is the account that started it — see oauth/handoff.ts.
+export function finishOAuth(handoff: string): Promise<{ ok: boolean; locationName: string }> {
+  return callFunction<{ ok: boolean; locationName: string }>('/oauthFinish', { handoff })
+}
+
 export async function startOAuth(): Promise<void> {
   // The server checks returnTo against an allowlist and ignores anything it does not know.
   const returnTo = encodeURIComponent(window.location.origin)

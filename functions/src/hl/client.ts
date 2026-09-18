@@ -2,13 +2,18 @@ import { config } from '../config'
 import { HlError } from '../errors'
 import { accessTokenFor } from './tokens'
 
-export async function hlGet<T>(
-  uid: string,
+interface Bearer {
+  accessToken: string
+  locationId: string
+}
+
+// Takes the credential rather than the uid, so the OAuth callback can read the location
+// name with a token it has just exchanged but has not committed to storage yet.
+export async function hlGetAs<T>(
+  { accessToken, locationId }: Bearer,
   path: string,
   query: Record<string, string | undefined> = {},
 ): Promise<T> {
-  const { accessToken, locationId } = await accessTokenFor(uid)
-
   const url = new URL(path, config.apiBase)
   for (const [key, value] of Object.entries({ locationId, ...query })) {
     if (value !== undefined) url.searchParams.set(key, value)
@@ -27,6 +32,14 @@ export async function hlGet<T>(
   if (!res.ok) throw new HlError('hl_error', `HighLevel returned ${res.status}`, 502)
 
   return (await res.json()) as T
+}
+
+export async function hlGet<T>(
+  uid: string,
+  path: string,
+  query: Record<string, string | undefined> = {},
+): Promise<T> {
+  return hlGetAs<T>(await accessTokenFor(uid), path, query)
 }
 
 // Writes. Separate from hlGet because the shapes differ per endpoint: some want
