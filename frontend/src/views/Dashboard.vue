@@ -28,7 +28,7 @@ const router = useRouter()
 const { projects, loading, create, update, remove } = useProjects()
 const { enabled: devMode } = useDev()
 
-readOAuthResult()
+void readOAuthResult()
 
 const dialogOpen = ref(false)
 const saving = ref(false)

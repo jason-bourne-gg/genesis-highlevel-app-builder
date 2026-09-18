@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { ExternalLinkIcon, LoaderCircleIcon, PlugZapIcon, RefreshCwIcon, UnplugIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -18,18 +18,43 @@ const frame = ref(0)
 const tokenError = ref('')
 const writes = ref(false)
 
+// Held here rather than baked into the document: hl.js asks for it once it is running, so
+// the model-written code that shares that document never has it in reach.
+const token = ref('')
+const frameEl = useTemplateRef<HTMLIFrameElement>('frameEl')
+// Frames of ours that live in another window — the open-in-a-new-tab copy.
+const detached = new Set<MessageEventSource>()
+
+// Answers a preview's request for its pass on the port it sent with the request, so the
+// reply reaches that frame and nothing else. Only frames this component created are
+// answered: a page that embedded Genesis could otherwise point its own sandboxed frame at
+// us and be handed a live pass.
+function serveToken(event: MessageEvent) {
+  if ((event.data as { genesis?: string } | null)?.genesis !== 'preview-token') return
+  if (!event.source) return
+  if (event.source !== frameEl.value?.contentWindow && !detached.has(event.source)) return
+
+  const port = event.ports[0]
+  if (!port) return
+  port.postMessage({ token: token.value })
+  port.close()
+}
+
+onMounted(() => window.addEventListener('message', serveToken))
+onBeforeUnmount(() => window.removeEventListener('message', serveToken))
+
 // A fresh token per render: short lived and scoped to this project.
 async function refresh() {
   tokenError.value = ''
   // Reset with the token. Left set, a previous successful mint would keep hl.writes true
   // after a disconnect or a failed mint, so the app would render write buttons that fail.
   writes.value = false
-  let token = ''
+  token.value = ''
 
   if (connected.value) {
     try {
       const grant = await mintPreviewToken(props.projectId)
-      token = grant.token
+      token.value = grant.token
       writes.value = grant.writes === true
     } catch (e) {
       // The app still renders; it just shows its own empty state when hl.js fails.
@@ -37,7 +62,7 @@ async function refresh() {
     }
   }
 
-  doc.value = buildPreview(files.value, token, writes.value)
+  doc.value = buildPreview(files.value, writes.value)
   frame.value++
 }
 
@@ -59,7 +84,16 @@ function openInTab() {
   win.opener = null
 
   const frame = win.document.querySelector('iframe')
-  if (frame) frame.srcdoc = doc.value
+  if (!frame) return
+
+  // The copy asks its own parent — this popup — for the pass, so the request has to be
+  // heard there and answered from here.
+  win.addEventListener('message', serveToken as EventListener)
+  win.addEventListener('pagehide', () => {
+    if (frame.contentWindow) detached.delete(frame.contentWindow)
+  })
+  frame.srcdoc = doc.value
+  if (frame.contentWindow) detached.add(frame.contentWindow)
 }
 </script>
 
@@ -97,6 +131,7 @@ function openInTab() {
     <div class="relative min-h-0 flex-1 bg-white">
       <iframe
         v-if="doc"
+        ref="frameEl"
         :key="frame"
         :srcdoc="doc"
         sandbox="allow-scripts"

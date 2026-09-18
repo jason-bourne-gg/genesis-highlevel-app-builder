@@ -20,7 +20,7 @@ const server = await import(
   /* @vite-ignore */ resolve(ROOT, 'functions/lib/generate/validate.js')
 )
 
-const HL = "var BASE = '__PREVIEW_BASE__'\nvar TOKEN = '__PREVIEW_TOKEN__'\nvar W = '__PREVIEW_WRITES__'"
+const HL = "var BASE = '__PREVIEW_BASE__'\nvar HOST = '__PREVIEW_HOST__'\nvar W = '__PREVIEW_WRITES__'"
 
 const shellWith = (link: string, hl: string, app: string) => `<!doctype html>
 <html lang="en">
@@ -47,11 +47,11 @@ const accepted = (shell: string) =>
   server.validateShell(new Map(filesFor(shell).map((f) => [f.path, f.content])), new Set(['index.html'])) === null
 
 const stitched = (shell: string) => {
-  const doc = buildPreview(filesFor(shell), 'tok', false)
+  const doc = buildPreview(filesFor(shell), false)
   return (
     doc.includes('.marker-css {}') &&
     doc.includes('const markerJs = 1') &&
-    doc.includes("var TOKEN = 'tok'")
+    doc.includes("var BASE = 'https://functions.example.test'")
   )
 }
 
