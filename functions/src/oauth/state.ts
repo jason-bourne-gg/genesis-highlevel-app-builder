@@ -11,22 +11,42 @@ export interface OAuthState {
   createdAt: number
 }
 
+// The nonce comes back to us on HighLevel's redirect, so it is caller-controlled. Firestore
+// reads a "/" as another path segment, and a deeper path is a different document under
+// different rules, so the shape is checked before it is used as one.
+const NONCE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+const ref = (nonce: string) => getFirestore().doc(`oauthStates/${nonce}`)
+
 export async function mintState(uid: string, origin: string): Promise<string> {
   const nonce = randomUUID()
-  await getFirestore().doc(`oauthStates/${nonce}`).set({ uid, origin, createdAt: Date.now() })
+  await ref(nonce).set({ uid, origin, createdAt: Date.now() })
   return nonce
 }
 
 export async function claimState(nonce: string): Promise<OAuthState> {
-  const ref = getFirestore().doc(`oauthStates/${nonce}`)
-  const snap = await ref.get()
+  if (!NONCE.test(nonce)) throw new HlError('bad_state', 'Malformed state', 400)
+
+  const doc = ref(nonce)
+  const snap = await doc.get()
   if (!snap.exists) throw new HlError('bad_state', 'Unknown or already used state', 400)
 
   const state = snap.data() as OAuthState
-  await ref.delete()
+  await doc.delete()
 
   if (Date.now() - state.createdAt > TTL_MS) {
     throw new HlError('bad_state', 'Authorization request expired', 400)
   }
   return state
+}
+
+// A claimed state deletes itself, but an abandoned one — the user closes the HighLevel tab —
+// is never claimed and would sit here forever.
+export async function sweepExpiredStates(): Promise<void> {
+  const stale = await getFirestore()
+    .collection('oauthStates')
+    .where('createdAt', '<', Date.now() - TTL_MS)
+    .limit(50)
+    .get()
+  await Promise.all(stale.docs.map((d) => d.ref.delete()))
 }

@@ -4,9 +4,51 @@
 export const HL_CLIENT_SOURCE = `// Injected by Genesis. Talks to the Genesis proxy, never to HighLevel directly.
 (function () {
   var BASE = '__PREVIEW_BASE__'
-  var TOKEN = '__PREVIEW_TOKEN__'
+  var HOST = '__PREVIEW_HOST__'
   var WRITES = '__PREVIEW_WRITES__' === 'on'
   var cache = {}
+
+  // The pass is never written into this document. app.js is model-written code sharing the
+  // same document, so anything in the source — or hung off window — is readable by it, and
+  // a stolen pass is fifteen minutes of someone else's HighLevel location. We ask Genesis
+  // for it over a MessageChannel instead. This is a classic inline script, so it runs while
+  // the document is still parsing and holds the only reference to the port long before the
+  // app module executes; by the time app.js could patch postMessage, the handshake is done.
+  var TOKEN = ''
+  var ready = new Promise(function (resolve, reject) {
+    if (!window.parent || window.parent === window) {
+      return reject(new Error('This preview is not running inside Genesis.'))
+    }
+
+    var channel = new MessageChannel()
+    var settled = false
+
+    function settle(err) {
+      if (settled) return
+      settled = true
+      channel.port1.onmessage = null
+      channel.port1.close()
+      if (err) reject(err)
+      else resolve(TOKEN)
+    }
+
+    channel.port1.onmessage = function (e) {
+      TOKEN = (e.data && e.data.token) || ''
+      settle(TOKEN ? null : new Error('Genesis has no HighLevel connection for this preview.'))
+    }
+
+    // A silent hang would leave every call pending forever, which reads as an app that
+    // simply never loads.
+    setTimeout(function () {
+      settle(new Error('Genesis did not hand this preview a HighLevel pass.'))
+    }, 15000)
+
+    window.parent.postMessage({ genesis: 'preview-token' }, HOST, [channel.port2])
+  })
+
+  // Every caller below chains its own handler; this only stops the bare rejection being
+  // reported as unhandled when the app makes no calls at all.
+  ready.catch(function () {})
 
   function url(resource, params) {
     var u = BASE + '/hlPreview/' + resource
@@ -29,7 +71,10 @@ export const HL_CLIENT_SOURCE = `// Injected by Genesis. Talks to the Genesis pr
   function get(resource, params) {
     var key = url(resource, params)
     if (!cache[key]) {
-      cache[key] = fetch(key, { headers: { 'X-Preview-Token': TOKEN } })
+      cache[key] = ready
+        .then(function () {
+          return fetch(key, { headers: { 'X-Preview-Token': TOKEN } })
+        })
         .then(unwrap)
         .catch(function (err) {
           delete cache[key]
@@ -40,11 +85,13 @@ export const HL_CLIENT_SOURCE = `// Injected by Genesis. Talks to the Genesis pr
   }
 
   function post(action, body) {
-    return fetch(BASE + '/hlPreview/' + action, {
-      method: 'POST',
-      headers: { 'X-Preview-Token': TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {})
-    }).then(unwrap)
+    return ready.then(function () {
+      return fetch(BASE + '/hlPreview/' + action, {
+        method: 'POST',
+        headers: { 'X-Preview-Token': TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      }).then(unwrap)
+    })
   }
 
   // ---- the confirmation dialog -------------------------------------------------

@@ -17,6 +17,9 @@ export interface AdminGrant {
   expiresAt: number
 }
 
+// Caller-controlled, and a "/" would make it a path to a different document.
+const SHAPE = /^[A-Za-z0-9_-]{43}$/
+
 const grantRef = (token: string) => getFirestore().doc(`adminTokens/${token}`)
 
 async function mintAdminToken(uid: string): Promise<{ token: string; expiresAt: number }> {
@@ -27,7 +30,7 @@ async function mintAdminToken(uid: string): Promise<{ token: string; expiresAt: 
 }
 
 export async function claimAdminToken(token: string): Promise<AdminGrant | null> {
-  if (!token) return null
+  if (!token || !SHAPE.test(token)) return null
   const snap = await grantRef(token).get()
   if (!snap.exists) return null
 

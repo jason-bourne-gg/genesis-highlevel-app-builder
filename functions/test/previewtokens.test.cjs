@@ -1,6 +1,11 @@
 const { atest, run, assert } = require('./harness.cjs')
 const { withStubs } = require('./stub.cjs')
 
+// mintPreviewToken issues 32 bytes of base64url, which is always 43 characters, and the
+// shape is checked before the pass is used as a document path. A fixture has to be
+// something the mint could actually have produced.
+const pass = (label) => label.padEnd(43, 'x')
+
 const UID = 'uid_alice'
 const OTHER = 'uid_bob'
 const PROJECT = 'proj_1'
@@ -61,7 +66,7 @@ atest('a missing pass is refused before any lookup', async () => {
 })
 
 atest('an expired pass is refused and deleted on the way out', async () => {
-  const token = 'stale'
+  const token = pass('stale')
   await withTokens(
     { [`previewTokens/${token}`]: { uid: UID, projectId: PROJECT, expiresAt: Date.now() - 1000, writes: 0 } },
     async ({ pt }, s) => {
@@ -74,7 +79,7 @@ atest('an expired pass is refused and deleted on the way out', async () => {
 // Badges minted before the budget existed have no writes field, and defaulting it wrong
 // would either lock them out or give them an unlimited allowance.
 atest('a pass predating the write budget is treated as having spent none', async () => {
-  const token = 'legacy'
+  const token = pass('legacy')
   await withTokens(
     { [`previewTokens/${token}`]: { uid: UID, projectId: PROJECT, expiresAt: Date.now() + 60_000 } },
     async ({ pt }) => {
@@ -96,7 +101,7 @@ atest('each write spends one from the budget', async () => {
 })
 
 atest('the budget runs out at twenty-five and says how to get a fresh one', async () => {
-  const token = 'spent'
+  const token = pass('spent')
   await withTokens(
     { [`previewTokens/${token}`]: { uid: UID, projectId: PROJECT, expiresAt: Date.now() + 60_000, writes: 25 } },
     async ({ pt }) => {
@@ -111,7 +116,7 @@ atest('the budget runs out at twenty-five and says how to get a fresh one', asyn
 })
 
 atest('an expired pass cannot be used for a write either', async () => {
-  const token = 'stale'
+  const token = pass('stale')
   await withTokens(
     { [`previewTokens/${token}`]: { uid: UID, projectId: PROJECT, expiresAt: Date.now() - 1, writes: 0 } },
     async ({ pt }) => {
@@ -149,13 +154,13 @@ atest('a project that does not exist is forbidden, not missing', async () => {
 atest('the sweep removes expired passes and leaves live ones', async () => {
   await withTokens(
     {
-      'previewTokens/old': { uid: UID, projectId: PROJECT, expiresAt: Date.now() - 60_000, writes: 0 },
-      'previewTokens/new': { uid: UID, projectId: PROJECT, expiresAt: Date.now() + 60_000, writes: 0 },
+      [`previewTokens/${pass('old')}`]: { uid: UID, projectId: PROJECT, expiresAt: Date.now() - 60_000, writes: 0 },
+      [`previewTokens/${pass('new')}`]: { uid: UID, projectId: PROJECT, expiresAt: Date.now() + 60_000, writes: 0 },
     },
     async ({ pt }, s) => {
       await pt.sweepExpired()
-      assert.strictEqual(s.docs.has('previewTokens/old'), false, 'kept an expired pass')
-      assert.strictEqual(s.docs.has('previewTokens/new'), true, 'swept a live pass')
+      assert.strictEqual(s.docs.has(`previewTokens/${pass('old')}`), false, 'kept an expired pass')
+      assert.strictEqual(s.docs.has(`previewTokens/${pass('new')}`), true, 'swept a live pass')
     },
   )
 })

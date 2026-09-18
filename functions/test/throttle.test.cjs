@@ -161,14 +161,18 @@ atest('a uid needing escaping cannot break out of the collection', async () => {
   })
 })
 
+// mintAdminToken issues 32 bytes of base64url, which is always 43 characters, and the
+// shape is checked before the pass is used as a document path.
+const pass = (label) => label.padEnd(43, 'x')
+
 // The pass itself: an opaque random string looked up server-side, same shape as the
 // preview badge, so it is revocable and there is no signing key to manage.
 atest('a live pass resolves to the account it was minted for', async () => {
   await withUnlock(
-    { 'adminTokens/abc': { uid: CALLER, expiresAt: Date.now() + 60_000 } },
+    { [`adminTokens/${pass('abc')}`]: { uid: CALLER, expiresAt: Date.now() + 60_000 } },
     configured,
     async ({ unlock }) => {
-      assert.strictEqual((await unlock.claimAdminToken('abc')).uid, CALLER)
+      assert.strictEqual((await unlock.claimAdminToken(pass('abc'))).uid, CALLER)
     },
   )
 })
@@ -178,17 +182,17 @@ atest('a live pass resolves to the account it was minted for', async () => {
 atest('a missing or unknown pass resolves to nothing, not an error', async () => {
   await withUnlock({}, configured, async ({ unlock }) => {
     assert.strictEqual(await unlock.claimAdminToken(''), null)
-    assert.strictEqual(await unlock.claimAdminToken('never-minted'), null)
+    assert.strictEqual(await unlock.claimAdminToken(pass('never-minted')), null)
   })
 })
 
 atest('an expired pass resolves to nothing and is cleaned up', async () => {
   await withUnlock(
-    { 'adminTokens/stale': { uid: CALLER, expiresAt: Date.now() - 1 } },
+    { [`adminTokens/${pass('stale')}`]: { uid: CALLER, expiresAt: Date.now() - 1 } },
     configured,
     async ({ unlock }, s) => {
-      assert.strictEqual(await unlock.claimAdminToken('stale'), null)
-      assert.strictEqual(s.docs.has('adminTokens/stale'), false, 'left behind')
+      assert.strictEqual(await unlock.claimAdminToken(pass('stale')), null)
+      assert.strictEqual(s.docs.has(`adminTokens/${pass('stale')}`), false, 'left behind')
     },
   )
 })
@@ -198,14 +202,14 @@ atest('an expired pass resolves to nothing and is cleaned up', async () => {
 atest('the sweep removes expired passes and leaves live ones', async () => {
   await withUnlock(
     {
-      'adminTokens/old': { uid: CALLER, expiresAt: Date.now() - 60_000 },
-      'adminTokens/new': { uid: CALLER, expiresAt: Date.now() + 60_000 },
+      [`adminTokens/${pass('old')}`]: { uid: CALLER, expiresAt: Date.now() - 60_000 },
+      [`adminTokens/${pass('new')}`]: { uid: CALLER, expiresAt: Date.now() + 60_000 },
     },
     configured,
     async ({ unlock }, s) => {
       await unlock.sweepAdminTokens()
-      assert.strictEqual(s.docs.has('adminTokens/old'), false, 'kept an expired pass')
-      assert.strictEqual(s.docs.has('adminTokens/new'), true, 'swept a live pass')
+      assert.strictEqual(s.docs.has(`adminTokens/${pass('old')}`), false, 'kept an expired pass')
+      assert.strictEqual(s.docs.has(`adminTokens/${pass('new')}`), true, 'swept a live pass')
     },
   )
 })
