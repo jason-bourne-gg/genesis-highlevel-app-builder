@@ -112,6 +112,24 @@ describe('buildPreview', () => {
     expect(doc.indexOf('Content-Security-Policy')).toBeLessThan(doc.indexOf('<script>'))
   })
 
+  // A project keeps whatever hl.js it was last generated with, so a project written before
+  // the handshake existed would otherwise render a client that still wants a substituted
+  // pass — and get a dead placeholder instead.
+  it('prefers the client the server just handed it over the stored copy', () => {
+    const doc = buildPreview(files(), false, "var BASE = '__PREVIEW_BASE__'\nvar FRESH = 1")
+    expect(doc).toContain('var FRESH = 1')
+    expect(doc).toContain("var BASE = 'https://functions.example.test'")
+    expect(doc).not.toContain('__PREVIEW_BASE__')
+  })
+
+  // Reached only with no connection, so there is no pass to put there anyway.
+  it('leaves no dead token placeholder in a stored pre-handshake client', () => {
+    const legacy = files({ 'hl.js': "var TOKEN = '__PREVIEW_TOKEN__'" })
+    const doc = buildPreview(legacy, false)
+    expect(doc).toContain("var TOKEN = ''")
+    expect(doc).not.toContain('__PREVIEW_TOKEN__')
+  })
+
   // A model that ignored the template and wrote no head still gets a policy.
   it('still applies a policy to a shell with no head', () => {
     const headless = '<!doctype html><body><div id="app"></div><script type="module" src="app.js"></script></body>'

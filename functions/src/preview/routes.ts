@@ -1,5 +1,6 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { uidFrom } from '../auth'
+import { HL_CLIENT_SOURCE } from '../generate/hlClient'
 import { isHlError } from '../errors'
 import { flagOn } from '../flags/store'
 import { queryFrom, readAllowed } from '../hl/proxy'
@@ -24,7 +25,16 @@ export const previewToken = onRequest({ cors: true }, async (req, res) => {
     // Opportunistic, and never allowed to fail the mint.
     void sweepExpired().catch(() => {})
     // The frame needs to know whether to offer write controls at all.
-    res.json({ ...grant, writes: await flagOn('hl_writes', uid) })
+    //
+    // hl.js also comes from here rather than from the project's stored copy. It is ours,
+    // not the model's, and a project only gets a new one when it is next generated — so
+    // serving it per render is what stops a project written months ago from running a
+    // client we have since fixed.
+    res.json({
+      ...grant,
+      writes: await flagOn('hl_writes', uid),
+      client: HL_CLIENT_SOURCE,
+    })
   } catch (e) {
     res.status(isHlError(e) ? e.status : 400).json({ error: (e as Error).message })
   }

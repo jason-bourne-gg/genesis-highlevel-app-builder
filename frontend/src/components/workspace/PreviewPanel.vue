@@ -21,6 +21,8 @@ const writes = ref(false)
 // Held here rather than baked into the document: hl.js asks for it once it is running, so
 // the model-written code that shares that document never has it in reach.
 const token = ref('')
+// The server's own hl.js, not the project's stored copy — see services/preview.ts.
+const client = ref('')
 const frameEl = useTemplateRef<HTMLIFrameElement>('frameEl')
 // Frames of ours that live in another window — the open-in-a-new-tab copy.
 const detached = new Set<MessageEventSource>()
@@ -50,19 +52,21 @@ async function refresh() {
   // after a disconnect or a failed mint, so the app would render write buttons that fail.
   writes.value = false
   token.value = ''
+  client.value = ''
 
   if (connected.value) {
     try {
       const grant = await mintPreviewToken(props.projectId)
       token.value = grant.token
       writes.value = grant.writes === true
+      client.value = grant.client ?? ''
     } catch (e) {
       // The app still renders; it just shows its own empty state when hl.js fails.
       tokenError.value = (e as Error).message
     }
   }
 
-  doc.value = buildPreview(files.value, writes.value)
+  doc.value = buildPreview(files.value, writes.value, client.value)
   frame.value++
 }
 

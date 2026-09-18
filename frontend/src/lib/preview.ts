@@ -49,14 +49,24 @@ const withPolicy = (html: string): string => {
 // HL_CLIENT_SOURCE. `writes` comes from the server's own resolution of the hl_writes flag,
 // not from anything the browser decided, and the proxy re-checks it on every write anyway.
 function fillClient(source: string, writes: boolean): string {
-  return source
-    .replace(/__PREVIEW_BASE__/g, () => functionsBase)
-    .replace(/__PREVIEW_HOST__/g, () => hostOrigin())
-    .replace(/__PREVIEW_WRITES__/g, () => (writes ? 'on' : 'off'))
+  return (
+    source
+      .replace(/__PREVIEW_BASE__/g, () => functionsBase)
+      .replace(/__PREVIEW_HOST__/g, () => hostOrigin())
+      .replace(/__PREVIEW_WRITES__/g, () => (writes ? 'on' : 'off'))
+      // Only a stored copy from before the handshake still has this. It is reached when
+      // there is no connection to mint a pass for, so there is nothing to put here —
+      // leaving the placeholder would just plant a dead credential in the document.
+      .replace(/__PREVIEW_TOKEN__/g, () => '')
+  )
 }
 
 // No bundler: the files are inlined by replacing the tags that reference them.
-export function buildPreview(files: ProjectFile[], writes = false): string {
+//
+// `client` is the hl.js the server just handed us. The project's own copy is only a
+// fallback for a preview with no connection, since a project keeps whatever client it was
+// last generated with and that one may predate the handshake.
+export function buildPreview(files: ProjectFile[], writes = false, client?: string): string {
   const html = contentOf(files, 'index.html')
   if (!html) return ''
 
@@ -68,7 +78,7 @@ export function buildPreview(files: ProjectFile[], writes = false): string {
       )
       .replace(
         /<script[^>]+src=["'](?:\.\/)?hl\.js["'][^>]*>\s*<\/script>/i,
-        () => `<script>\n${fillClient(contentOf(files, 'hl.js'), writes)}\n</script>`,
+        () => `<script>\n${fillClient(client || contentOf(files, 'hl.js'), writes)}\n</script>`,
       )
       .replace(
         /<script[^>]+src=["'](?:\.\/)?app\.js["'][^>]*>\s*<\/script>/i,
