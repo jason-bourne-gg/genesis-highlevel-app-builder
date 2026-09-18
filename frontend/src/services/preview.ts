@@ -6,6 +6,8 @@ export interface PreviewGrant {
   // The server's own answer for whether hl_writes is on for this user. The frame is told,
   // so it can hide write controls rather than render buttons that 403.
   writes: boolean
+  // The current hl.js, rather than whatever copy the project has stored. See preview/routes.ts.
+  client: string
 }
 
 // Short-lived and project-scoped: untrusted code never sees the HighLevel or Firebase token.
